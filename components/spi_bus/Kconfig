@@ -1,0 +1,7 @@
+menu "spi_bus"
+
+    config MPU_SPI
+        bool "enable mpu spi"
+        default "y"
+    
+endmenu

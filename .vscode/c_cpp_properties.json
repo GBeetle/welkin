@@ -1,0 +1,28 @@
+{
+    "configurations": [
+        {
+            "name": "Win32",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "${workspaceFolder}/components/i2c_bus/include",
+                "${workspaceFolder}/components/spi_bus/include",
+                "${workspaceFolder}/components/mpu_driver/include"
+            ],
+            "defines": [
+                "_DEBUG",
+                "UNICODE",
+                "_UNICODE",
+                "CONFIG_MPU6500",
+                "CONFIG_LIS3MDL",
+                "CONFIG_MPU_SPI"
+            ],
+            "windowsSdkVersion": "10.0.17763.0",
+            "compilerPath": "D:/VisualStudio/shared/VC/Tools/MSVC/14.16.27023/bin/Hostx64/x64/cl.exe",
+            "cStandard": "c17",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "windows-msvc-x64",
+            "configurationProvider": "ms-vscode.cmake-tools"
+        }
+    ],
+    "version": 4
+}

@@ -1,0 +1,25 @@
+{
+    "search.exclude": {
+        ".history":true,
+        "build": true,
+    },
+    "files.exclude": {
+        ".history":true,
+        "build": true,
+    },
+    "files.associations": {
+        "types.h": "c",
+        "mpu_types.h": "c",
+        "esp_log.h": "c",
+        "esp_rom_sys.h": "c",
+        "sdkconfig.h": "c",
+        "spi_bus.h": "c",
+        "lis3mdl.h": "c",
+        "lis3mdl_types.h": "c",
+        "mpu6500_dmp.h": "c",
+        "mpu_driver.h": "c",
+        "*.ipp": "c",
+        "charconv": "cpp"
+    },
+    "C_Cpp.errorSquiggles": "Disabled"
+}

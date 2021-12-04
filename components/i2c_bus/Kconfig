@@ -1,0 +1,7 @@
+menu "i2c_bus"
+
+config MPU_I2C
+    bool "enable mpu i2c"
+    default "n"
+
+endmenu

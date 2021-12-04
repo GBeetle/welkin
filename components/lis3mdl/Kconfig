@@ -1,0 +1,7 @@
+menu "lis3mdl"
+
+    config LIS3MDL
+        bool "enable magnetic lis3mdl"
+        default "n"
+    
+endmenu

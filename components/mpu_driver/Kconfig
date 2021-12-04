@@ -1,0 +1,7 @@
+menu "mpu_driver"
+
+    config MPU6500
+        bool "enable mpu6500"
+        default "y"
+    
+endmenu

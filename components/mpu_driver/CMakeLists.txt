@@ -1,0 +1,9 @@
+set(COMPONENT_SRCS "mpu_driver.c"
+                   "mpu6500_dmp.c"
+                   "ml_math_func.c"
+                   "motion.c")
+set(COMPONENT_REQUIRES spi_bus i2c_bus lis3mdl)
+
+set(COMPONENT_ADD_INCLUDEDIRS "include")
+
+register_component()
