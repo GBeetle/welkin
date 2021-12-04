@@ -4,6 +4,6 @@ cmake_minimum_required(VERSION 3.5)
 #set(COMPONENT_REQUIRES "mpu_driver" "spi_bus")
 
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
-project(monkeykong)
+project(welkin)
 
 #component_compile_options(PUBLIC -DCONFIG_MPU9250 -DCONFIG_MPU_SPI)
