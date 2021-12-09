@@ -71,91 +71,6 @@ Pins in use. The SPI Master can use the GPIO mux, so feel free to change these i
 struct mpu mpu;  // create a default MPU object
 #endif
 
-/*
- * Task control block.  A task control block (TCB) is allocated for each task,
- * and stores task state information, including a pointer to the task's context
- * (the task's run time environment, including register values)
- */
-typedef struct tskTaskControlBlock 			/* The old naming convention is used to prevent breaking kernel aware debuggers. */
-{
-	volatile StackType_t	*pxTopOfStack;	/*< Points to the location of the last item placed on the tasks stack.  THIS MUST BE THE FIRST MEMBER OF THE TCB STRUCT. */
-
-	#if ( portUSING_MPU_WRAPPERS == 1 )
-		xMPU_SETTINGS	xMPUSettings;		/*< The MPU settings are defined as part of the port layer.  THIS MUST BE THE SECOND MEMBER OF THE TCB STRUCT. */
-	#endif
-
-	ListItem_t			xStateListItem;	/*< The list that the state list item of a task is reference from denotes the state of that task (Ready, Blocked, Suspended ). */
-	ListItem_t			xEventListItem;		/*< Used to reference a task from an event list. */
-	UBaseType_t			uxPriority;			/*< The priority of the task.  0 is the lowest priority. */
-	StackType_t			*pxStack;			/*< Points to the start of the stack. */
-	char				pcTaskName[ configMAX_TASK_NAME_LEN ];/*< Descriptive name given to the task when created.  Facilitates debugging only. */ /*lint !e971 Unqualified char types are allowed for strings and single characters only. */
-	BaseType_t			xCoreID;			/*< Core this task is pinned to */
-
-	#if ( ( portSTACK_GROWTH > 0 ) || ( configRECORD_STACK_HIGH_ADDRESS == 1 ) )
-		StackType_t		*pxEndOfStack;		/*< Points to the highest valid address for the stack. */
-	#endif
-
-	#if ( portCRITICAL_NESTING_IN_TCB == 1 )
-		UBaseType_t		uxCriticalNesting;	/*< Holds the critical section nesting depth for ports that do not maintain their own count in the port layer. */
-	#endif
-
-	#if ( configUSE_TRACE_FACILITY == 1 )
-		UBaseType_t		uxTCBNumber;		/*< Stores a number that increments each time a TCB is created.  It allows debuggers to determine when a task has been deleted and then recreated. */
-		UBaseType_t		uxTaskNumber;		/*< Stores a number specifically for use by third party trace code. */
-	#endif
-
-	#if ( configUSE_MUTEXES == 1 )
-		UBaseType_t		uxBasePriority;		/*< The priority last assigned to the task - used by the priority inheritance mechanism. */
-		UBaseType_t		uxMutexesHeld;
-	#endif
-
-	#if ( configUSE_APPLICATION_TASK_TAG == 1 )
-		TaskHookFunction_t pxTaskTag;
-	#endif
-
-	#if( configNUM_THREAD_LOCAL_STORAGE_POINTERS > 0 )
-		void			*pvThreadLocalStoragePointers[ configNUM_THREAD_LOCAL_STORAGE_POINTERS ];
-	#if ( configTHREAD_LOCAL_STORAGE_DELETE_CALLBACKS )
-		TlsDeleteCallbackFunction_t pvThreadLocalStoragePointersDelCallback[ configNUM_THREAD_LOCAL_STORAGE_POINTERS ];
-	#endif
-	#endif
-
-	#if( configGENERATE_RUN_TIME_STATS == 1 )
-		uint32_t		ulRunTimeCounter;	/*< Stores the amount of time the task has spent in the Running state. */
-	#endif
-
-	#if ( configUSE_NEWLIB_REENTRANT == 1 )
-		/* Allocate a Newlib reent structure that is specific to this task.
-		Note Newlib support has been included by popular demand, but is not
-		used by the FreeRTOS maintainers themselves.  FreeRTOS is not
-		responsible for resulting newlib operation.  User must be familiar with
-		newlib and must provide system-wide implementations of the necessary
-		stubs. Be warned that (at the time of writing) the current newlib design
-		implements a system-wide malloc() that must be provided with locks. */
-		struct	_reent xNewLib_reent;
-	#endif
-
-	#if( configUSE_TASK_NOTIFICATIONS == 1 )
-		volatile uint32_t ulNotifiedValue;
-		volatile uint8_t ucNotifyState;
-	#endif
-
-	/* See the comments in FreeRTOS.h with the definition of
-	tskSTATIC_AND_DYNAMIC_ALLOCATION_POSSIBLE. */
-	#if( tskSTATIC_AND_DYNAMIC_ALLOCATION_POSSIBLE != 0 ) /*lint !e731 !e9029 Macro has been consolidated for readability reasons. */
-		uint8_t	ucStaticallyAllocated; 		/*< Set to pdTRUE if the task is a statically allocated to ensure no attempt is made to free the memory. */
-	#endif
-
-	#if( INCLUDE_xTaskAbortDelay == 1 )
-		uint8_t ucDelayAborted;
-	#endif
-
-	#if( configUSE_POSIX_ERRNO == 1 )
-		int iTaskErrno;
-	#endif
-
-} tskTCB;
-
 TaskHandle_t mpu_isr_handle;
 
 uint8_t __bswap_8(uint8_t value)
@@ -228,8 +143,13 @@ static void IRAM_ATTR mpu_dmp_isr_handler(void* arg)
 {
     mpu_isr_manager.mpu_isr_status = DATA_READY;
     isr_counter++;
+    //ets_printf("isr before:[%s] stat:[%d] prid:[%d]\n", pcTaskGetTaskName(mpu_isr_handle), eTaskGetState(mpu_isr_handle), uxTaskPriorityGetFromISR(mpu_isr_handle));
     //xTaskResumeFromISR(mpu_isr_handle);
-    //ets_printf("[%s] \n", ((tskTCB *)mpu_isr_handle)->pcTaskName);
+    //ets_printf("isr after:[%s] stat:[%d]\n", pcTaskGetTaskName(mpu_isr_handle), eTaskGetState(mpu_isr_handle));
+    /* Notify the task that the transmission is complete. */
+    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+    vTaskNotifyGiveFromISR(mpu_isr_handle, &xHigherPriorityTaskWoken);
+    portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 }
 #endif
 
@@ -254,7 +174,6 @@ static void mpu_get_sensor_data(void* arg)
             accelG  = accelGravity_raw(&accelRaw, accel_fs);
             gyroDPS = gyroDegPerSec_raw(&gyroRaw, gyro_fs);
             magDPS  = magGauss_raw(&magRaw, lis3mdl_scale_12_Gs);
-
 #ifdef SOFT_IMU_UPDATE
             motion_state_t state;
             imuUpdate(accelG, gyroDPS, &state , 1.0 / 250);
@@ -279,15 +198,36 @@ static void mpu_get_sensor_data(void* arg)
             mpu_isr_manager.mpu_isr_status = DATA_NOT_READY;
         }
         //vTaskSuspend(mpu_isr_handle);
+        /* Wait to be notified that the transmission is complete.  Note
+        the first parameter is pdTRUE, which has the effect of clearing
+        the task's notification value back to 0, making the notification
+        value act like a binary (rather than a counting) semaphore.  */
+        uint32_t ul_notification_value;
+        const TickType_t max_block_time = pdMS_TO_TICKS( 200 );
+        ul_notification_value = ulTaskNotifyTake(pdTRUE, max_block_time );
+
+        if( ul_notification_value == 1 )
+        {
+            /* The transmission ended as expected. */
+        }
+        else
+        {
+            /* The call to ulTaskNotifyTake() timed out. */
+        }
     }
 }
 
 static void test(void* arg)
 {
     while (1) {
-        printf("[test idle task]\n");
-        //vTaskResume(mpu_isr_handle);
+        ets_printf("[test idle task start] prio:[%d]\n", uxTaskPriorityGet(NULL));
+        /*
+        char task[200];
+        vTaskList(task);
+        ets_printf("%s\n",task);
+        */
         vTaskDelay(100);
+        ets_printf("[test idle task end]\n");
     }
 }
 
@@ -295,6 +235,8 @@ static void test(void* arg)
 void app_main(void)
 {
     //fflush(stdout);
+    //esp_log_level_set(TAG, ESP_LOG_DEBUG);
+
     uart_config_t uart_config = {
         .baud_rate = 115200,
         .data_bits = UART_DATA_8_BITS,
@@ -439,7 +381,7 @@ void app_main(void)
     printf("accel: [%+6.2f %+6.2f %+6.2f ] (G) \t\n", accelG.data.x, accelG.data.y, accelG.data.z);
 #endif
 
-    xTaskCreate(mpu_get_sensor_data, "mpu_get_sensor_data", 2048, 2 | portPRIVILEGE_BIT, 10, &mpu_isr_handle);
+    xTaskCreate(mpu_get_sensor_data, "mpu_get_sensor_data", 2048, NULL, 2 | portPRIVILEGE_BIT, &mpu_isr_handle);
     xTaskCreate(test, "test", 2048, NULL, 1 | portPRIVILEGE_BIT, NULL);
     //vTaskStartScheduler();
 

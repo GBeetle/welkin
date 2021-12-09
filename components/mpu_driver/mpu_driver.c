@@ -464,7 +464,7 @@ static esp_err_t initialize(struct mpu *mpu)
     // set Digital Low Pass Filter to get smoother data
     if (MPU_ERR_CHECK(mpu->setDigitalLowPassFilter(mpu, DLPF_188HZ))) return mpu->err;
     // set sample rate to 1000Hz  from 4Hz - 1kHz
-    if (MPU_ERR_CHECK(mpu->setSampleRate(mpu, 100))) return mpu->err;
+    if (MPU_ERR_CHECK(mpu->setSampleRate(mpu, 1000))) return mpu->err;
 
     int_config_t config = {
         .level = INT_LVL_ACTIVE_HIGH,
