@@ -9,6 +9,7 @@
 
 //#include "mltypes.h"
 #include "math.h"
+#include "mpu_math.h"
 #include <stdint.h>
 
 #if defined EMPL
@@ -29,6 +30,12 @@ typedef unsigned long long inv_time_t;
 #define INV_TWO_POWER_NEG_30 9.313225746154785e-010f
 
 float invSqrt(float x);
+
+float degreesToRadians(int16_t degrees);
+float sin_approx(float x);
+float cos_approx(float x);
+float atan2_approx(float y, float x);
+float acos_approx(float x);
 
 #ifdef __cplusplus
 extern "C" {

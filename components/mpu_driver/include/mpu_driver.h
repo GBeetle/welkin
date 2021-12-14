@@ -40,6 +40,7 @@
 #include "sdkconfig.h"
 #include "lis3mdl.h"
 #include "isr_manager.h"
+#include "AHRS.h"
 
 #define MPU_ERR_CHECK(x) (x)
 

@@ -34,10 +34,10 @@
  * get_ms(unsigned long *count)
  */
 #if defined EMPL_TARGET_STM32F4
-#include "i2c.h"   
+#include "i2c.h"
 #include "main.h"
 #include "board-st_discovery.h"
-   
+
 #define i2c_write   Sensors_I2C_WriteRegister
 #define i2c_read    Sensors_I2C_ReadRegister
 #define get_ms      get_tick_count
@@ -585,7 +585,7 @@ int mpu_write_mem(struct mpu *mpu, unsigned short mem_addr, unsigned short lengt
     /* Check bank boundaries. */
     if (tmp[1] + length > 256)
         return -1;
-    //printf("mpu write mem 03\n");  
+    //printf("mpu write mem 03\n");
     if (mpu->writeBytes(mpu, bank_sel, 2, tmp))
         return -1;
     //printf("mpu write mem 04\n");
@@ -690,7 +690,7 @@ int mpu_read_fifo_stream(struct mpu *mpu, unsigned short length, unsigned char *
     if (mpu->readBytes(mpu, FIFO_COUNT_H, 2, tmp)) {
         printf("mpu_read_fifo_stream read FIFO count failed\n");
         return -1;
-    } 
+    }
     fifo_count = (tmp[0] << 8) | tmp[1];
     if (fifo_count < length) {
         //printf("\n fifo count: %d\n", fifo_count);
@@ -718,7 +718,7 @@ int mpu_read_fifo_stream(struct mpu *mpu, unsigned short length, unsigned char *
     return 0;
 }
 
-static void tap_cb(unsigned char direction, unsigned char count)
+void tap_cb(unsigned char direction, unsigned char count)
 {
     switch (direction) {
     case TAP_X_UP:
@@ -746,7 +746,7 @@ static void tap_cb(unsigned char direction, unsigned char count)
     return;
 }
 
-static void android_orient_cb(unsigned char orientation)
+void android_orient_cb(unsigned char orientation)
 {
 	switch (orientation) {
 	case ANDROID_ORIENT_PORTRAIT:
@@ -813,7 +813,7 @@ int mpu_load_firmware(struct mpu *mpu, unsigned short length, const unsigned cha
         return -1;
     //printf("Load firmware 03\n");
     dmp_loaded = 1;
-    
+
     //TODO: set mpu sample rate to sample_rate
     //st.chip_cfg.dmp_sample_rate = sample_rate;
     return 0;

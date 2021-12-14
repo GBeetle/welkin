@@ -18,8 +18,48 @@
 #include "mpu_types.h"
 #include "sdkconfig.h"
 
+// Use floating point M_PI instead explicitly.
+#define M_PIf       3.14159265358979323846f
+#define M_LN2f      0.69314718055994530942f
+#define M_Ef        2.71828182845904523536f
+
+#define sinPolyCoef3 -1.666568107e-1f
+#define sinPolyCoef5  8.312366210e-3f
+#define sinPolyCoef7 -1.849218155e-4f
+#define sinPolyCoef9  0
+
 #define DEG2RAD		0.017453293f	/* 度转弧度 π/180 */
 #define RAD2DEG		57.29578f		/* 弧度转度 180/π */
+
+#define RAD    (M_PIf / 180.0f)
+
+#define DEGREES_TO_CENTIDEGREES(angle) ((angle) * 100)
+#define CENTIDEGREES_TO_DEGREES(angle) ((angle) / 100)
+
+#define CENTIDEGREES_TO_DECIDEGREES(angle) ((angle) / 10)
+#define DECIDEGREES_TO_CENTIDEGREES(angle) ((angle) * 10)
+
+#define DEGREES_TO_DECIDEGREES(angle) ((angle) * 10)
+#define DECIDEGREES_TO_DEGREES(angle) ((angle) / 10)
+
+#define DEGREES_PER_DEKADEGREE 10
+#define DEGREES_TO_DEKADEGREES(angle) ((angle) / DEGREES_PER_DEKADEGREE)
+#define DEKADEGREES_TO_DEGREES(angle) ((angle) * DEGREES_PER_DEKADEGREE)
+
+#define DEGREES_TO_RADIANS(angle) ((angle) * RAD)
+#define RADIANS_TO_DEGREES(angle) ((angle) / RAD)
+#define DECIDEGREES_TO_RADIANS(angle) (((angle) / 10.0f) * RAD)
+#define RADIANS_TO_DECIDEGREES(angle) (((angle) * 10.0f) / RAD)
+
+#define RADIANS_TO_CENTIDEGREES(angle) (((angle) * 100.0f) / RAD)
+#define CENTIDEGREES_TO_RADIANS(angle) (((angle) / 100.0f) * RAD)
+
+#define MIN(a, b) 	(((a) < (b)) ? (a) : (b))
+#define MAX(a, b) 	(((a) > (b)) ? (a) : (b))
+
+#ifndef sq
+#define sq(x) ((x)*(x))
+#endif
 
 inline uint8_t accelFSRvalue(const accel_fs_t fs)
 {
