@@ -452,6 +452,7 @@ static esp_err_t initialize(struct mpu *mpu)
 #if defined CONFIG_LIS3MDL
     compass_enabled = 1;
     if (MPU_ERR_CHECK(mpu->compassInit(mpu))) return mpu->err;
+    imuInit();
 #endif
 
     // set gyro to 32kHz fchoice 0 | 1 & set accel to 4KHz fchoice 0
@@ -464,7 +465,7 @@ static esp_err_t initialize(struct mpu *mpu)
     // set Digital Low Pass Filter to get smoother data
     if (MPU_ERR_CHECK(mpu->setDigitalLowPassFilter(mpu, DLPF_188HZ))) return mpu->err;
     // set sample rate to 1000Hz  from 4Hz - 1kHz
-    if (MPU_ERR_CHECK(mpu->setSampleRate(mpu, 1000))) return mpu->err;
+    if (MPU_ERR_CHECK(mpu->setSampleRate(mpu, 250))) return mpu->err;
 
     int_config_t config = {
         .level = INT_LVL_ACTIVE_HIGH,

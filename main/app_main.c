@@ -56,7 +56,7 @@ Pins in use. The SPI Master can use the GPIO mux, so feel free to change these i
 #define SPI_CLOCK_SPEED SPI_MASTER_FREQ_20M
 
 #define MPU_INT_ENABLE
-#define DEBUG_LOG
+//#define DEBUG_LOG
 #define MPU_NO_DMP
 #define SOFT_IMU_UPDATE
 
@@ -163,7 +163,7 @@ static void mpu_get_sensor_data(void* arg)
     float_axes_t magDPS;   // gyro axes in (Gauss) format
 
     while (1) {
-        ets_printf("[SAMPLE] %u\n", isr_counter);
+        //ets_printf("[SAMPLE] %u\n", isr_counter);
         if(mpu_isr_manager.mpu_isr_status) {
             // Read
             mpu.acceleration(&mpu, &accelRaw);  // fetch raw data from the registers
@@ -176,7 +176,8 @@ static void mpu_get_sensor_data(void* arg)
             magDPS  = magGauss_raw(&magRaw, lis3mdl_scale_12_Gs);
 #ifdef SOFT_IMU_UPDATE
             motion_state_t state;
-            imuUpdate(accelG, gyroDPS, &state , 1.0 / 250);
+            //imuUpdate(accelG, gyroDPS, &state, 1.0 / 250);
+            imuUpdateAttitude(accelG, gyroDPS, magDPS, &state, 1.0 / 250);
 #endif
 
 #ifndef DEBUG_LOG
@@ -220,14 +221,14 @@ static void mpu_get_sensor_data(void* arg)
 static void test(void* arg)
 {
     while (1) {
-        ets_printf("[test idle task start] prio:[%d]\n", uxTaskPriorityGet(NULL));
+        //ets_printf("[test idle task start] prio:[%d]\n", uxTaskPriorityGet(NULL));
         /*
         char task[200];
         vTaskList(task);
         ets_printf("%s\n",task);
         */
         vTaskDelay(100);
-        ets_printf("[test idle task end]\n");
+        //ets_printf("[test idle task end]\n");
     }
 }
 
