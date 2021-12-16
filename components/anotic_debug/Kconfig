@@ -1,0 +1,7 @@
+menu "anotic_debug"
+
+config ANOTIC_DEBUG
+    bool "enable anotic debug tools"
+    default "y"
+
+endmenu

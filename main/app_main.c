@@ -29,7 +29,6 @@
 #include "nvs_flash.h"
 #include "soc/rtc_periph.h"
 #include "driver/spi_master.h"
-#include "esp_log.h"
 #include "esp_spi_flash.h"
 #include "rom/ets_sys.h"
 
@@ -40,9 +39,8 @@
 #include "mpu_driver.h"
 #include "mpu6500_dmp.h"
 #include "motion.h"
-
-static const char* TAG = "[mwm]";
-
+#include "anotic_debug.h"
+#include "log_sys.h"
 
 /*
 Pins in use. The SPI Master can use the GPIO mux, so feel free to change these if needed.
@@ -56,7 +54,6 @@ Pins in use. The SPI Master can use the GPIO mux, so feel free to change these i
 #define SPI_CLOCK_SPEED SPI_MASTER_FREQ_20M
 
 #define MPU_INT_ENABLE
-//#define DEBUG_LOG
 #define MPU_NO_DMP
 #define SOFT_IMU_UPDATE
 
@@ -72,70 +69,6 @@ struct mpu mpu;  // create a default MPU object
 #endif
 
 TaskHandle_t mpu_isr_handle;
-
-uint8_t __bswap_8(uint8_t value)
-{
-    return (value>>4) | (value<<4);
-}
-
-uint16_t float2int16(float value)
-{
-    uint32_t num = value * 100;
-    return num & 0xffffffff;
-}
-
-int anotc_init_data(uint8_t *send_buffer, uint32_t arg_nums, ...)
-{
-    va_list args;
-    uint32_t idx = 0;
-    uint8_t checksum = 0;
-    uint8_t addcheck = 0;
-
-    va_start(args, arg_nums);
-    send_buffer[idx++] = 0xAA;
-    send_buffer[idx++] = 0xFF;
-    send_buffer[idx++] = 0x03;
-    send_buffer[idx++] = 0x00;
-
-    for (uint32_t i = 0; i < arg_nums; i++) {
-        uint32_t size = va_arg(args, uint32_t);
-
-        send_buffer[3] += size;
-        switch (size) {
-            case 4: {
-                uint32_t num = va_arg(args, uint32_t);
-                memcpy(send_buffer + idx, &num, 4);
-                break;
-            }
-            case 2: {
-                uint16_t num = va_arg(args, uint32_t);
-                memcpy(send_buffer + idx, &num, 2);
-                break;
-            }
-            case 1: {
-                uint8_t num = va_arg(args, uint32_t);
-                memcpy(send_buffer + idx, &num, 1);
-                break;
-            }
-            default: {
-                printf("Wrong format for size: %d\n", size);
-                return -1;
-            }
-        }
-        idx += size;
-    }
-
-    for (int i = 0; i < send_buffer[3] + 4; i++) {
-        checksum += send_buffer[i];
-        addcheck += checksum;
-    }
-    send_buffer[idx++] = checksum;
-    send_buffer[idx++] = addcheck;
-
-    va_end(args);
-    return 0;
-}
-
 uint32_t isr_counter = 0;
 
 #ifdef MPU_INT_ENABLE
@@ -163,7 +96,9 @@ static void mpu_get_sensor_data(void* arg)
     float_axes_t magDPS;   // gyro axes in (Gauss) format
 
     while (1) {
-        //ets_printf("[SAMPLE] %u\n", isr_counter);
+#ifndef CONFIG_ANOTIC_DEBUG
+        ets_printf("[SAMPLE] %u\n", isr_counter);
+#endif
         if(mpu_isr_manager.mpu_isr_status) {
             // Read
             mpu.acceleration(&mpu, &accelRaw);  // fetch raw data from the registers
@@ -180,21 +115,21 @@ static void mpu_get_sensor_data(void* arg)
             imuUpdateAttitude(accelG, gyroDPS, magDPS, &state, 1.0 / 250);
 #endif
 
-#ifndef DEBUG_LOG
+#if defined CONFIG_ANOTIC_DEBUG
             uint8_t send_buffer[100];
             anotc_init_data(send_buffer, 3, sizeof(uint16_t), float2int16(state.attitude.roll), sizeof(uint16_t), float2int16(state.attitude.pitch),
                 sizeof(uint16_t), float2int16(state.attitude.yaw), sizeof(uint8_t), 0x01);
 
             uart_write_bytes(UART_NUM_0, (const uint8_t *)send_buffer, send_buffer[3] + 6);
-#elif defined SOFT_IMU_UPDATE
-            //printf("roll:%f pitch:%f yaw:%f\n", state.attitude.roll, state.attitude.pitch, state.attitude.yaw);
+#else
+            ESP_LOGD(SENSOR_TAG, "roll:%f pitch:%f yaw:%f\n", state.attitude.roll, state.attitude.pitch, state.attitude.yaw);
 #endif
 
-#ifdef DEBUG_LOG
+#ifndef CONFIG_ANOTIC_DEBUG
             // Debug
-            //printf("gyro: [%+7.2f %+7.2f %+7.2f ] (º/s) \t", gyroDPS.xyz[0], gyroDPS.xyz[1], gyroDPS.xyz[2]);
-            //printf("accel: [%+6.2f %+6.2f %+6.2f ] (G) \t", accelG.data.x, accelG.data.y, accelG.data.z);
-            //printf("mag: [%+6.2f %+6.2f %+6.2f ] (Gauss) \n", magDPS.data.x, magDPS.data.y, magDPS.data.z);
+            ESP_LOGD(SENSOR_TAG, "gyro: [%+7.2f %+7.2f %+7.2f ] (º/s) \t", gyroDPS.xyz[0], gyroDPS.xyz[1], gyroDPS.xyz[2]);
+            ESP_LOGD(SENSOR_TAG, "accel: [%+6.2f %+6.2f %+6.2f ] (G) \t", accelG.data.x, accelG.data.y, accelG.data.z);
+            ESP_LOGD(SENSOR_TAG, "mag: [%+6.2f %+6.2f %+6.2f ] (Gauss) \n", magDPS.data.x, magDPS.data.y, magDPS.data.z);
 #endif
             mpu_isr_manager.mpu_isr_status = DATA_NOT_READY;
         }
@@ -236,8 +171,7 @@ static void test(void* arg)
 void app_main(void)
 {
     //fflush(stdout);
-    //esp_log_level_set(TAG, ESP_LOG_DEBUG);
-
+    welkin_log_system_init();
     uart_config_t uart_config = {
         .baud_rate = 115200,
         .data_bits = UART_DATA_8_BITS,
@@ -273,17 +207,13 @@ void app_main(void)
     // Great! Let's verify the communication
     // (this also check if the connected MPU supports the implementation of chip selected in the component menu)
     while (mpu.testConnection(&mpu)) {
-        printf("Failed to connect to the MPU\n");
+        ESP_LOGE(ERROR_TAG, "Failed to connect to the MPU\n");
         vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
     //ESP_LOGI(TAG, "MPU connection successful!");
 
     // Initialize
     ESP_ERROR_CHECK(mpu.initialize(&mpu));  // initialize the chip and set initial configurations
-    // Setup with your configurations
-    // ESP_ERROR_CHECK(MPU.setSampleRate(50));  // set sample rate to 50 Hz
-    // ESP_ERROR_CHECK(MPU.setGyroFullScale(mpud::GYRO_FS_500DPS));
-    // ESP_ERROR_CHECK(MPU.setAccelFullScale(mpud::ACCEL_FS_4G));
 
     /*
     selftest_t st_result;
@@ -309,8 +239,8 @@ void app_main(void)
     mpu_read_mem(&mpu, 0, 4, data);
     for (int i = 0; i < 4; i++) {
         if (data[i] != i + 5) {
-            printf("Read Write Error");
-            printf("%d %d %d %d\n", data[0], data[1], data[2], data[3]);
+            ESP_LOGE(ERROR_TAG, "Read Write Error");
+            ESP_LOGE(ERROR_TAG, "%d %d %d %d\n", data[0], data[1], data[2], data[3]);
             return;
         }
     }
@@ -344,15 +274,7 @@ void app_main(void)
     gpio_isr_handler_add(MPU_DMP_INT, mpu_dmp_isr_handler, (void*) MPU_DMP_INT);
 #endif
 
-    // Reading sensor data
-    raw_axes_t accelRaw;   // x, y, z axes as int16
-    raw_axes_t gyroRaw;    // x, y, z axes as int16
-    raw_axes_t magRaw;     // x, y, z axes as int16
-    float_axes_t accelG;   // accel axes in (g) gravity format
-    float_axes_t gyroDPS;  // gyro axes in (DPS) º/s format
-    float_axes_t magDPS;   // gyro axes in (Gauss) format
-
-#ifdef NEVER_DEBUG
+#if 0
     memset(&accelRaw, 0, 3 * sizeof(short));
     memset(&gyroRaw, 0, 3 * sizeof(short));
     accelG  = accelGravity_raw(&accelRaw, accel_fs);
@@ -399,6 +321,14 @@ void app_main(void)
         */
 
 #ifndef MPU_NO_DMP
+        // Reading sensor data
+        raw_axes_t accelRaw;   // x, y, z axes as int16
+        raw_axes_t gyroRaw;    // x, y, z axes as int16
+        raw_axes_t magRaw;     // x, y, z axes as int16
+        float_axes_t accelG;   // accel axes in (g) gravity format
+        float_axes_t gyroDPS;  // gyro axes in (DPS) º/s format
+        float_axes_t magDPS;   // gyro axes in (Gauss) format
+
         unsigned long sensor_timestamp;
         short sensors;
         unsigned char more;
@@ -421,24 +351,21 @@ void app_main(void)
         memset(quat, 0, 4 * sizeof(long));
 
         if (dmp_read_fifo(&mpu, gyroRaw.xyz, accelRaw.xyz, quat, &sensor_timestamp, &sensors, &more)) {
-#ifdef DEBUG_LOG
             printf("dmp read fifo error\n");
-#endif
             //memset(quat, 0, 4 * sizeof(long));
         }
+#ifdef CONFIG_ANOTIC_DEBUG
         //memset(&gyroRaw, 0, 3 * sizeof(short));
         anotc_init_data(send_buffer, 4, sizeof(uint16_t), quat[0] >> 16, sizeof(uint16_t), quat[1] >> 16,
             sizeof(uint16_t), quat[2] >> 16, sizeof(uint16_t), quat[3] >> 16, sizeof(uint8_t), 0x01);
 
-#ifndef DEBUG_LOG
         uart_write_bytes(UART_NUM_0, (const uint8_t *)send_buffer, send_buffer[3] + 6);
-#endif
+#else
 
         accelG  = accelGravity_raw(&accelRaw, accel_fs);
         gyroDPS = gyroDegPerSec_raw(&gyroRaw, gyro_fs);
         magDPS  = magGauss_raw(&magRaw, lis3mdl_scale_12_Gs);
 
-#ifdef DEBUG_LOG
         // Debug
         printf("[gy]: [%+7.2f %+7.2f %+7.2f ] (º/s) \t", gyroDPS.xyz[0], gyroDPS.xyz[1], gyroDPS.xyz[2]);
         printf("[acc]: [%+6.2f %+6.2f %+6.2f ] (G) \t", accelG.data.x, accelG.data.y, accelG.data.z);

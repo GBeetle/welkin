@@ -1939,7 +1939,7 @@ static esp_err_t auxI2CWriteByte(struct mpu *mpu, uint8_t devAddr, uint8_t regAd
  * */
 static esp_err_t auxI2CReadByte(struct mpu *mpu, uint8_t devAddr, uint8_t regAddr, uint8_t* data)
 {
-    printf("[mwm] start auxI2CReadByte\n");
+    //printf("[mwm] start auxI2CReadByte\n");
     // check for Aux I2C master enabled first
     const bool kAuxI2CEnabled = mpu->getAuxI2CEnabled(mpu);
     if (MPU_ERR_CHECK(mpu->lastError(mpu))) return mpu->err;
@@ -2120,6 +2120,7 @@ static esp_err_t compassWriteByte(struct mpu *mpu, uint8_t regAddr, const uint8_
 static esp_err_t compassInit(struct mpu *mpu)
 {
     if (MPU_ERR_CHECK(mpu->setAuxI2CReset(mpu))) return mpu->err;
+    // must delay, or compass may not be initialized
     vTaskDelay(50 / portTICK_PERIOD_MS);
     // I2C 接口设置旁路模式
 #ifdef CONFIG_MPU_I2C
