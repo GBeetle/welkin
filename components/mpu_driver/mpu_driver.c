@@ -479,6 +479,7 @@ static esp_err_t initialize(struct mpu *mpu)
     if (mpu->setInterruptEnabled(mpu, mask)) return mpu->err;
 
     //MPU_LOGI("Initialization complete");
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
     return mpu->err;
 }
 
@@ -2694,7 +2695,7 @@ static esp_err_t getBiases(struct mpu *mpu, accel_fs_t accelFS, gyro_fs_t gyroFS
     if (MPU_ERR_CHECK(mpu->lastError(mpu))) return mpu->err;
     const int packetCount = fifoCount / kPacketSize;
     // read overrun bytes, if any
-    const int overrunCount      = fifoCount - (packetCount * kPacketSize);
+    const int overrunCount = fifoCount - (packetCount * kPacketSize);
     uint8_t buffer[kPacketSize];
     memset(buffer, 0, kPacketSize);
     if (overrunCount > 0) {

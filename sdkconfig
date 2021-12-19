@@ -1209,10 +1209,10 @@ CONFIG_LIS3MDL=y
 # end of lis3mdl
 
 #
-# LOG System
+# log_system
 #
 CONFIG_LOG_SYSTEM=y
-# end of LOG System
+# end of log_system
 
 #
 # mpu_driver

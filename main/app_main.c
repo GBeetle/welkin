@@ -214,36 +214,21 @@ void app_main(void)
 
     // Initialize
     ESP_ERROR_CHECK(mpu.initialize(&mpu));  // initialize the chip and set initial configurations
+    ESP_ERROR_CHECK(mpu_rw_test(&mpu));
 
     /*
     selftest_t st_result;
     mpu.selfTest(&mpu, &st_result);
     if (st_result != SELF_TEST_PASS) {
         if (st_result == SELF_TEST_GYRO_FAIL)
-            printf("SELF_TEST_GYRO_FAIL\n");
+            ESP_LOGE(ERROR_TAG, "SELF_TEST_GYRO_FAIL\n");
         else if (st_result == SELF_TEST_ACCEL_FAIL)
-            printf("SELF_TEST_ACCEL_FAIL\n");
+            ESP_LOGE(ERROR_TAG, "SELF_TEST_ACCEL_FAIL\n");
         else
-            printf("SELT_TEST_FAIL 0x%x\n", (uint8_t)st_result);
+            ESP_LOGE(ERROR_TAG, "SELT_TEST_FAIL 0x%x\n", (uint8_t)st_result);
         return;
     }
     */
-
-    unsigned char data[4];
-    for (int i = 0; i < 4; i++) {
-        data[i] = i + 5;
-    }
-    //mpu.writeBytes(&mpu, 0x63, 4, data);
-    //mpu.readBytes(&mpu, 0x63, 4, data);
-    mpu_write_mem(&mpu, 0, 4, data);
-    mpu_read_mem(&mpu, 0, 4, data);
-    for (int i = 0; i < 4; i++) {
-        if (data[i] != i + 5) {
-            ESP_LOGE(ERROR_TAG, "Read Write Error");
-            ESP_LOGE(ERROR_TAG, "%d %d %d %d\n", data[0], data[1], data[2], data[3]);
-            return;
-        }
-    }
 
     //ESP_ERROR_CHECK(dmp_initialize(&mpu));
 
@@ -309,17 +294,6 @@ void app_main(void)
     //vTaskStartScheduler();
 
     while (true) {
-        //printf("main while\n");
-        //vTaskDelay(100);
-        /*
-        mpu.readBytes(&mpu, INT_PIN_CONFIG, 1, &dmp_int);
-        printf("dmp int config: %02x\n", dmp_int);
-        mpu.readBytes(&mpu, INT_ENABLE, 1, &dmp_int);
-        printf("dmp int enable: %02x\n", dmp_int);
-        mpu.readBytes(&mpu, INT_STATUS, 1, &dmp_int);
-        printf("dmp int status: %02x\n", dmp_int);
-        */
-
 #ifndef MPU_NO_DMP
         // Reading sensor data
         raw_axes_t accelRaw;   // x, y, z axes as int16

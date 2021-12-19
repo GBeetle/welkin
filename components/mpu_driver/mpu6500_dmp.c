@@ -24,6 +24,7 @@
 #include "dmpkey.h"
 #include "dmpmap.h"
 #include "mpu_driver.h"
+#include "log_sys.h"
 
 /* The following functions must be defined for this platform:
  * i2c_write(unsigned char slave_addr, unsigned char reg_addr,
@@ -1767,5 +1768,24 @@ int dmp_initialize(struct mpu *mpu)
     if (mpu_reset_fifo(mpu)) return -7;
 
     return 0;
+}
+
+esp_err_t mpu_rw_test(struct mpu *mpu)
+{
+    // mpu read/write test
+    unsigned char data[4];
+    for (int i = 0; i < 4; i++) {
+        data[i] = i + 5;
+    }
+    mpu_write_mem(mpu, 0, 4, data);
+    mpu_read_mem(mpu, 0, 4, data);
+    for (int i = 0; i < 4; i++) {
+        if (data[i] != i + 5) {
+            ESP_LOGE(ERROR_TAG, "Read Write Error");
+            ESP_LOGE(ERROR_TAG, "%d %d %d %d\n", data[0], data[1], data[2], data[3]);
+            return ESP_FAIL;
+        }
+    }
+    return ESP_OK;
 }
 

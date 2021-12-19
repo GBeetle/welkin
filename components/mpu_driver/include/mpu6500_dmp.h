@@ -220,5 +220,7 @@ int mpu_read_fifo_stream(struct mpu *mpu, unsigned short length, unsigned char *
 
 int mpu_reset_fifo(struct mpu *mpu);
 
+esp_err_t mpu_rw_test(struct mpu *mpu);
+
 #endif  /* #ifndef _MPU6500_DMP_H_ */
 
