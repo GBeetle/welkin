@@ -19,7 +19,9 @@
         "mpu6500_dmp.h": "c",
         "mpu_driver.h": "c",
         "*.ipp": "c",
-        "charconv": "cpp"
+        "charconv": "cpp",
+        "anotic_debug.h": "c",
+        "log_sys.h": "c"
     },
     "C_Cpp.errorSquiggles": "Disabled"
 }

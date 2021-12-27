@@ -35,6 +35,8 @@
 #include "driver/gpio.h"
 #include "esp_intr_alloc.h"
 #include "driver/uart.h"
+#include "soc/uart_struct.h"
+#include "hal/uart_ll.h"
 
 #include "mpu_driver.h"
 #include "mpu6500_dmp.h"
@@ -54,7 +56,7 @@ Pins in use. The SPI Master can use the GPIO mux, so feel free to change these i
 #define SPI_CLOCK_SPEED SPI_MASTER_FREQ_20M
 
 #define MPU_INT_ENABLE
-#define MPU_NO_DMP
+//#define MPU_DMP
 #define SOFT_IMU_UPDATE
 
 #define SDA 11
@@ -70,6 +72,7 @@ struct mpu mpu;  // create a default MPU object
 
 TaskHandle_t mpu_isr_handle;
 uint32_t isr_counter = 0;
+static uint8_t rx_command_id = 0x00;
 
 #ifdef MPU_INT_ENABLE
 static void IRAM_ATTR mpu_dmp_isr_handler(void* arg)
@@ -97,7 +100,7 @@ static void mpu_get_sensor_data(void* arg)
 
     while (1) {
 #ifndef CONFIG_ANOTIC_DEBUG
-        ets_printf("[SAMPLE] %u\n", isr_counter);
+        //ets_printf("[SAMPLE] %u\n", isr_counter);
 #endif
         if(mpu_isr_manager.mpu_isr_status) {
             // Read
@@ -117,10 +120,26 @@ static void mpu_get_sensor_data(void* arg)
 
 #if defined CONFIG_ANOTIC_DEBUG
             uint8_t send_buffer[100];
-            anotc_init_data(send_buffer, 3, sizeof(uint16_t), float2int16(state.attitude.roll), sizeof(uint16_t), float2int16(state.attitude.pitch),
-                sizeof(uint16_t), float2int16(state.attitude.yaw), sizeof(uint8_t), 0x01);
-
-            uart_write_bytes(UART_NUM_0, (const uint8_t *)send_buffer, send_buffer[3] + 6);
+            switch (rx_command_id) {
+                case 0x00:
+                    break;
+                case 0x01:
+                    anotc_init_data(send_buffer, 0x01, 6, sizeof(uint16_t), accelRaw.x, sizeof(uint16_t), accelRaw.y, sizeof(uint16_t), accelRaw.z,
+                        sizeof(uint16_t), gyroRaw.x, sizeof(uint16_t), gyroRaw.y, sizeof(uint16_t), gyroRaw.z, sizeof(uint8_t), 0x00);
+                    break;
+                case 0x02:
+                    anotc_init_data(send_buffer, 0x02, 6, sizeof(uint16_t), magRaw.x, sizeof(uint16_t), magRaw.y, sizeof(uint16_t), magRaw.z,
+                        sizeof(uint32_t), 0x00, sizeof(uint16_t), 0x00, sizeof(uint8_t), 0x00, sizeof(uint8_t), 0x00);
+                    break;
+                case 0x03:
+                    anotc_init_data(send_buffer, 0x03, 3, sizeof(uint16_t), float2int16(state.attitude.roll), sizeof(uint16_t), float2int16(state.attitude.pitch),
+                        sizeof(uint16_t), float2int16(state.attitude.yaw), sizeof(uint8_t), 0x01);
+                    break;
+                default:
+                    ESP_LOGE(ERROR_TAG, "wrong command id from uart: %02x\n", rx_command_id);
+            }
+            if (rx_command_id >= 0x01 && rx_command_id <= 0x03)
+                uart_write_bytes(UART_NUM_0, (const uint8_t *)send_buffer, send_buffer[3] + 6);
 #else
             ESP_LOGD(SENSOR_TAG, "roll:%f pitch:%f yaw:%f\n", state.attitude.roll, state.attitude.pitch, state.attitude.yaw);
 #endif
@@ -142,12 +161,10 @@ static void mpu_get_sensor_data(void* arg)
         const TickType_t max_block_time = pdMS_TO_TICKS( 200 );
         ul_notification_value = ulTaskNotifyTake(pdTRUE, max_block_time );
 
-        if( ul_notification_value == 1 )
-        {
+        if( ul_notification_value == 1 ) {
             /* The transmission ended as expected. */
         }
-        else
-        {
+        else {
             /* The call to ulTaskNotifyTake() timed out. */
         }
     }
@@ -167,21 +184,79 @@ static void test(void* arg)
     }
 }
 
+/*
+ * Define UART interrupt subroutine to ackowledge interrupt
+ */
+/*
+uint8_t rxbuf[256];
+static void uart_intr_handle(void *param)
+{
+    ets_printf("[UART_RECEIVE ISR]\n");
+    volatile uart_dev_t *uart = &UART0;
+    uart->int_clr.rxfifo_full = 1;
+    uart->int_clr.frm_err = 1;
+    uart->int_clr.rxfifo_tout = 1;
+    while (uart->status.rxfifo_cnt) {
+        uint8_t c = uart->ahb_fifo.rw_byte;
+        uart_write_bytes(UART_NUM_0, (char *)&c, 1);  //把接收的数据重新打印出来
+    }
+}
+*/
+
+// receive frame format 0xAA_ID_AA
+static void uart_rx_task(void *arg)
+{
+    const int RX_BUF_SIZE = 1024;
+    uint8_t* data = (uint8_t*)malloc(RX_BUF_SIZE + 1);
+    while (1) {
+        const int rxBytes = uart_read_bytes(UART_NUM_0, data, RX_BUF_SIZE, 1000 / portTICK_RATE_MS);
+        if (rxBytes <= 0)
+            continue;
+        if (rxBytes != 3 || data[0] != 0xaa || data[2] != 0xaa)
+            rx_command_id = 0xff;
+        else
+            rx_command_id = data[1];
+        /*
+        if (rxBytes > 0) {
+            data[rxBytes] = 0;
+            ESP_LOGI(RX_TASK_TAG, "Read %d bytes: '%s'", rxBytes, data);
+            ESP_LOG_BUFFER_HEXDUMP(RX_TASK_TAG, data, rxBytes, ESP_LOG_INFO);
+        }
+        */
+    }
+    free(data);
+}
+
 //Main application
 void app_main(void)
 {
     //fflush(stdout);
     welkin_log_system_init();
     uart_config_t uart_config = {
-        .baud_rate = 115200,
-        .data_bits = UART_DATA_8_BITS,
-        .parity    = UART_PARITY_DISABLE,
-        .stop_bits = UART_STOP_BITS_1,
-        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
+        .baud_rate  = 115200,
+        .data_bits  = UART_DATA_8_BITS,
+        .parity     = UART_PARITY_DISABLE,
+        .stop_bits  = UART_STOP_BITS_1,
+        .flow_ctrl  = UART_HW_FLOWCTRL_DISABLE,
         .source_clk = UART_SCLK_APB,
     };
-    uart_driver_install(UART_NUM_0, 2*1024, 0, 0, NULL, 0);
-    uart_param_config(UART_NUM_0, &uart_config);
+    ESP_ERROR_CHECK(uart_driver_install(UART_NUM_0, 2*1024, 0, 0, NULL, 0));
+    ESP_ERROR_CHECK(uart_param_config(UART_NUM_0, &uart_config));
+    /*
+    // release the pre registered UART handler/subroutine
+	ESP_ERROR_CHECK(uart_isr_free(UART_NUM_0));
+	// register new UART subroutine
+    uart_intr_config_t uart_isr_config = {
+        .intr_enable_mask         = UART_INTR_RXFIFO_FULL,
+        .rx_timeout_thresh        = 120,
+        .txfifo_empty_intr_thresh = 10,
+        .rxfifo_full_thresh       = 10,
+    };
+    ESP_ERROR_CHECK(uart_intr_config(UART_NUM_0, &uart_isr_config));
+	ESP_ERROR_CHECK(uart_isr_register(UART_NUM_0, uart_intr_handle, NULL, 0, NULL));
+	// enable RX interrupt
+	ESP_ERROR_CHECK(uart_enable_rx_intr(UART_NUM_0));
+    */
 
 #if defined CONFIG_MPU_SPI
     spi_device_handle_t mpu_spi_handle;
@@ -216,7 +291,6 @@ void app_main(void)
     ESP_ERROR_CHECK(mpu.initialize(&mpu));  // initialize the chip and set initial configurations
     ESP_ERROR_CHECK(mpu_rw_test(&mpu));
 
-    /*
     selftest_t st_result;
     mpu.selfTest(&mpu, &st_result);
     if (st_result != SELF_TEST_PASS) {
@@ -228,15 +302,14 @@ void app_main(void)
             ESP_LOGE(ERROR_TAG, "SELT_TEST_FAIL 0x%x\n", (uint8_t)st_result);
         return;
     }
-    */
-
-    //ESP_ERROR_CHECK(dmp_initialize(&mpu));
 
     //printf("Start to set Offset\n");
     //ESP_ERROR_CHECK(mpu.setOffsets(&mpu));
     //raw_axes_t acc;
     //memset(&acc, 0x3f, sizeof(acc));
     //mpu.setGyroOffset(&mpu, acc);
+
+    //ESP_ERROR_CHECK(dmp_initialize(&mpu));
 
 #ifdef MPU_INT_ENABLE
     gpio_config_t io_conf;
@@ -259,42 +332,57 @@ void app_main(void)
     gpio_isr_handler_add(MPU_DMP_INT, mpu_dmp_isr_handler, (void*) MPU_DMP_INT);
 #endif
 
-#if 0
-    memset(&accelRaw, 0, 3 * sizeof(short));
-    memset(&gyroRaw, 0, 3 * sizeof(short));
-    accelG  = accelGravity_raw(&accelRaw, accel_fs);
-    gyroDPS = gyroDegPerSec_raw(&gyroRaw, gyro_fs);
-    printf("[test]gyro: [%+7.2f %+7.2f %+7.2f ] (º/s) \t", gyroDPS.xyz[0], gyroDPS.xyz[1], gyroDPS.xyz[2]);
-    printf("accel: [%+6.2f %+6.2f %+6.2f ] (G) \t\n", accelG.data.x, accelG.data.y, accelG.data.z);
-
-    memset(&accelRaw, 0x80, 3 * sizeof(short));
-    memset(&gyroRaw, 0x80, 3 * sizeof(short));
-    accelG  = accelGravity_raw(&accelRaw, accel_fs);
-    gyroDPS = gyroDegPerSec_raw(&gyroRaw, gyro_fs);
-    printf("[test]gyro: [%+7.2f %+7.2f %+7.2f ] (º/s) \t", gyroDPS.xyz[0], gyroDPS.xyz[1], gyroDPS.xyz[2]);
-    printf("accel: [%+6.2f %+6.2f %+6.2f ] (G) \t\n", accelG.data.x, accelG.data.y, accelG.data.z);
-
-    memset(&accelRaw, 0x7f, 3 * sizeof(short));
-    memset(&gyroRaw, 0x7f, 3 * sizeof(short));
-    accelG  = accelGravity_raw(&accelRaw, accel_fs);
-    gyroDPS = gyroDegPerSec_raw(&gyroRaw, gyro_fs);
-    printf("[test]gyro: [%+7.2f %+7.2f %+7.2f ] (º/s) \t", gyroDPS.xyz[0], gyroDPS.xyz[1], gyroDPS.xyz[2]);
-    printf("accel: [%+6.2f %+6.2f %+6.2f ] (G) \t\n", accelG.data.x, accelG.data.y, accelG.data.z);
-
-    memset(&accelRaw, 0xff, 3 * sizeof(short));
-    memset(&gyroRaw, 0xff, 3 * sizeof(short));
-    accelG  = accelGravity_raw(&accelRaw, accel_fs);
-    gyroDPS = gyroDegPerSec_raw(&gyroRaw, gyro_fs);
-    printf("[test]gyro: [%+7.2f %+7.2f %+7.2f ] (º/s) \t", gyroDPS.xyz[0], gyroDPS.xyz[1], gyroDPS.xyz[2]);
-    printf("accel: [%+6.2f %+6.2f %+6.2f ] (G) \t\n", accelG.data.x, accelG.data.y, accelG.data.z);
-#endif
-
     xTaskCreate(mpu_get_sensor_data, "mpu_get_sensor_data", 2048, NULL, 2 | portPRIVILEGE_BIT, &mpu_isr_handle);
+    xTaskCreate(uart_rx_task, "uart_rx_task", 1024*2, NULL, configMAX_PRIORITIES, NULL);
     xTaskCreate(test, "test", 2048, NULL, 1 | portPRIVILEGE_BIT, NULL);
     //vTaskStartScheduler();
 
+    /*
+    const fifo_config_t kFIFOConfig = FIFO_CFG_ACCEL | FIFO_CFG_GYRO;
+    const size_t kPacketSize        = 12;
+
+    ESP_ERROR_CHECK(mpu.setFIFOConfig(&mpu, kFIFOConfig));
+    ESP_ERROR_CHECK(mpu.setFIFOEnabled(&mpu, true));
+    // wait for 200ms for sensors to stabilize
+    vTaskDelay(200 / portTICK_PERIOD_MS);
+    ESP_ERROR_CHECK(mpu.resetFIFO(&mpu));
+    */
+
     while (true) {
-#ifndef MPU_NO_DMP
+        /*
+        // get FIFO count
+        uint16_t fifoCount = mpu.getFIFOCount(&mpu);
+        uint8_t buffer[kPacketSize];
+
+        memset(buffer, 0, kPacketSize);
+        while (fifoCount < kPacketSize) {
+            //printf("FIFO count = 0, waitting for 100ms\n");
+            fifoCount = mpu.getFIFOCount(&mpu);
+        }
+        ESP_LOGD(SENSOR_TAG, "fifo_count: %d\n", fifoCount);
+        ESP_ERROR_CHECK(mpu.lastError(&mpu));
+        const int packetCount = fifoCount / kPacketSize;
+        for (int i = 0; i < packetCount; i++) {
+            if (MPU_ERR_CHECK(mpu.readFIFO(&mpu, kPacketSize, buffer))) {
+                printf("getBiases read FIFO done size: %d\n", kPacketSize);
+                return;
+            }
+            raw_axes_t accelCur, gyroCur;
+            // retrieve data
+            accelCur.data.x = (buffer[0] << 8) | buffer[1];
+            accelCur.data.y = (buffer[2] << 8) | buffer[3];
+            accelCur.data.z = (buffer[4] << 8) | buffer[5];
+            gyroCur.data.x  = (buffer[6] << 8) | buffer[7];
+            gyroCur.data.y  = (buffer[8] << 8) | buffer[9];
+            gyroCur.data.z  = (buffer[10] << 8) | buffer[11];
+
+            float_axes_t accelG  = accelGravity_raw(&accelCur, accel_fs);
+            float_axes_t gyroDPS = gyroDegPerSec_raw(&gyroCur, gyro_fs);
+            ESP_LOGD(SENSOR_TAG, "[Bias]gyro: [%+7.2f %+7.2f %+7.2f ] (º/s) \t", gyroDPS.xyz[0], gyroDPS.xyz[1], gyroDPS.xyz[2]);
+            ESP_LOGD(SENSOR_TAG, "[Bias]accel: [%+6.2f %+6.2f %+6.2f ] (G) \t\n", accelG.data.x, accelG.data.y, accelG.data.z);
+        }
+        */
+#ifdef MPU_DMP
         // Reading sensor data
         raw_axes_t accelRaw;   // x, y, z axes as int16
         raw_axes_t gyroRaw;    // x, y, z axes as int16

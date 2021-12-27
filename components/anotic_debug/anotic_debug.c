@@ -11,7 +11,7 @@ uint16_t float2int16(float value)
     return num & 0xffffffff;
 }
 
-int anotc_init_data(uint8_t *send_buffer, uint32_t arg_nums, ...)
+int anotc_init_data(uint8_t *send_buffer, uint8_t command_id, uint32_t arg_nums, ...)
 {
     va_list args;
     uint32_t idx = 0;
@@ -21,7 +21,7 @@ int anotc_init_data(uint8_t *send_buffer, uint32_t arg_nums, ...)
     va_start(args, arg_nums);
     send_buffer[idx++] = 0xAA;
     send_buffer[idx++] = 0xFF;
-    send_buffer[idx++] = 0x03;
+    send_buffer[idx++] = command_id;
     send_buffer[idx++] = 0x00;
 
     for (uint32_t i = 0; i < arg_nums; i++) {

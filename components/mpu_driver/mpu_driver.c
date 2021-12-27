@@ -2490,9 +2490,9 @@ static esp_err_t accelSelfTest(struct mpu *mpu, raw_axes_t* regularBias, raw_axe
     /* Convert biases */
     float_axes_t regularBiasGravity  = accelGravity_raw(regularBias, kAccelFS);
     float_axes_t selfTestBiasGravity = accelGravity_raw(selfTestBias, kAccelFS);
-    printf("EMPTY, regularBias: %+d %+d %+d | regularBiasGravity: %+.2f %+.2f %+.2f\n", regularBias->data.x,
+    ESP_LOGD(ST_TAG, "EMPTY, regularBias: %+d %+d %+d | regularBiasGravity: %+.2f %+.2f %+.2f\n", regularBias->data.x,
                 regularBias->data.y, regularBias->data.z, regularBiasGravity.data.x, regularBiasGravity.data.y, regularBiasGravity.data.z);
-    printf("EMPTY, selfTestBias: %+d %+d %+d | selfTestBiasGravity: %+.2f %+.2f %+.2f\n", selfTestBias->data.x,
+    ESP_LOGD(ST_TAG, "EMPTY, selfTestBias: %+d %+d %+d | selfTestBiasGravity: %+.2f %+.2f %+.2f\n", selfTestBias->data.x,
                 selfTestBias->data.y, selfTestBias->data.z, selfTestBiasGravity.data.x, selfTestBiasGravity.data.y, selfTestBiasGravity.data.z);
 
     /* Get OTP production shift code */
@@ -2506,7 +2506,7 @@ static esp_err_t accelSelfTest(struct mpu *mpu, raw_axes_t* regularBias, raw_axe
 #elif defined CONFIG_MPU6500
     if (MPU_ERR_CHECK(mpu->readBytes(mpu, SELF_TEST_X_ACCEL, 3, shiftCode))) return mpu->err;
 #endif
-    printf("EMPTY, shiftCode: %+d %+d %+d\n", shiftCode[0], shiftCode[1], shiftCode[2]);
+    ESP_LOGD(ST_TAG, "EMPTY, shiftCode: %+d %+d %+d\n", shiftCode[0], shiftCode[1], shiftCode[2]);
 
     /* Calulate production shift value */
     float shiftProduction[3] = {0};
@@ -2524,7 +2524,7 @@ static esp_err_t accelSelfTest(struct mpu *mpu, raw_axes_t* regularBias, raw_axe
 #endif
         }
     }
-    printf("EMPTY, shiftProduction: %+.2f %+.2f %+.2f\n", shiftProduction[0], shiftProduction[1],
+    ESP_LOGD(ST_TAG, "EMPTY, shiftProduction: %+.2f %+.2f %+.2f\n", shiftProduction[0], shiftProduction[1],
                 shiftProduction[2]);
 
     /* Evaluate criterias */
@@ -2549,11 +2549,11 @@ static esp_err_t accelSelfTest(struct mpu *mpu, raw_axes_t* regularBias, raw_axe
         if (fabs(regularBiasGravity.xyz[i] > kMaxGravityOffset)) *result |= 1 << i;
 #endif
     }
-    printf("EMPTY, shiftResponse: %+.2f %+.2f %+.2f\n", shiftResponse[0], shiftResponse[1], shiftResponse[2]);
-    printf("EMPTY, shiftVariation: %+.2f %+.2f %+.2f\n", shiftVariation[0], shiftVariation[1],
+    ESP_LOGD(ST_TAG, "EMPTY, shiftResponse: %+.2f %+.2f %+.2f\n", shiftResponse[0], shiftResponse[1], shiftResponse[2]);
+    ESP_LOGD(ST_TAG, "EMPTY, shiftVariation: %+.2f %+.2f %+.2f\n", shiftVariation[0], shiftVariation[1],
                 shiftVariation[2]);
 
-    printf("Accel self-test: [X=%s] [Y=%s] [Z=%s]\n", ((*result & 0x1) ? "FAIL" : "OK"),
+    ESP_LOGD(ST_TAG, "Accel self-test: [X=%s] [Y=%s] [Z=%s]\n", ((*result & 0x1) ? "FAIL" : "OK"),
              ((*result & 0x2) ? "FAIL" : "OK"), ((*result & 0x4) ? "FAIL" : "OK"));
     return mpu->err;
 }
@@ -2583,9 +2583,9 @@ static esp_err_t gyroSelfTest(struct mpu *mpu, raw_axes_t* regularBias, raw_axes
     /* Convert biases */
     float_axes_t regularBiasDPS  = gyroDegPerSec_raw(regularBias, kGyroFS);
     float_axes_t selfTestBiasDPS = gyroDegPerSec_raw(selfTestBias, kGyroFS);
-    printf("EMPTY, regularBias: %+d %+d %+d | regularBiasDPS: %+.2f %+.2f %+.2f\n", regularBias->data.x,
+    ESP_LOGD(ST_TAG, "EMPTY, regularBias: %+d %+d %+d | regularBiasDPS: %+.2f %+.2f %+.2f\n", regularBias->data.x,
                 regularBias->data.y, regularBias->data.z, regularBiasDPS.data.x, regularBiasDPS.data.y, regularBiasDPS.data.z);
-    printf("EMPTY, selfTestBias: %+d %+d %+d | selfTestBiasDPS: %+.2f %+.2f %+.2f\n", selfTestBias->data.x,
+    ESP_LOGD(ST_TAG, "EMPTY, selfTestBias: %+d %+d %+d | selfTestBiasDPS: %+.2f %+.2f %+.2f\n", selfTestBias->data.x,
                 selfTestBias->data.y, selfTestBias->data.z, selfTestBiasDPS.data.x, selfTestBiasDPS.data.y, selfTestBiasDPS.data.z);
 
     /* Get OTP production shift code */
@@ -2599,7 +2599,7 @@ static esp_err_t gyroSelfTest(struct mpu *mpu, raw_axes_t* regularBias, raw_axes
 #elif defined CONFIG_MPU6500
     if (MPU_ERR_CHECK(mpu->readBytes(mpu, SELF_TEST_X_GYRO, 3, shiftCode))) return mpu->err;
 #endif
-    printf("EMPTY, shiftCode: %+d %+d %+d\n", shiftCode[0], shiftCode[1], shiftCode[2]);
+    ESP_LOGD(ST_TAG, "EMPTY, shiftCode: %+d %+d %+d\n", shiftCode[0], shiftCode[1], shiftCode[2]);
 
     /* Calulate production shift value */
     float shiftProduction[3] = {0};
@@ -2615,7 +2615,7 @@ static esp_err_t gyroSelfTest(struct mpu *mpu, raw_axes_t* regularBias, raw_axes
 #endif
         }
     }
-    printf("EMPTY, shiftProduction: %+.2f %+.2f %+.2f\n", shiftProduction[0], shiftProduction[1],
+    ESP_LOGD(ST_TAG, "EMPTY, shiftProduction: %+.2f %+.2f %+.2f\n", shiftProduction[0], shiftProduction[1],
                 shiftProduction[2]);
 
     /* Evaluate criterias */
@@ -2634,11 +2634,11 @@ static esp_err_t gyroSelfTest(struct mpu *mpu, raw_axes_t* regularBias, raw_axes
             *result |= 1 << i;
         }
     }
-    printf("EMPTY, shiftResponse: %+.2f %+.2f %+.2f\n", shiftResponse[0], shiftResponse[1], shiftResponse[2]);
-    printf("EMPTY, shiftVariation: %+.2f %+.2f %+.2f\n", shiftVariation[0], shiftVariation[1],
+    ESP_LOGD(ST_TAG, "EMPTY, shiftResponse: %+.2f %+.2f %+.2f\n", shiftResponse[0], shiftResponse[1], shiftResponse[2]);
+    ESP_LOGD(ST_TAG, "EMPTY, shiftVariation: %+.2f %+.2f %+.2f\n", shiftVariation[0], shiftVariation[1],
                 shiftVariation[2]);
 
-    printf("Gyro self-test: [X=%s] [Y=%s] [Z=%s]\n", ((*result & 0x1) ? "FAIL" : "OK"),
+    ESP_LOGD(ST_TAG, "Gyro self-test: [X=%s] [Y=%s] [Z=%s]\n", ((*result & 0x1) ? "FAIL" : "OK"),
              ((*result & 0x2) ? "FAIL" : "OK"), ((*result & 0x4) ? "FAIL" : "OK"));
     return mpu->err;
 }
@@ -2655,7 +2655,10 @@ static esp_err_t getBiases(struct mpu *mpu, accel_fs_t accelFS, gyro_fs_t gyroFS
     const uint16_t kSampleRate      = 1000;
     const dlpf_t kDLPF              = DLPF_188HZ;
     const fifo_config_t kFIFOConfig = FIFO_CFG_ACCEL | FIFO_CFG_GYRO;
-    const size_t kPacketSize        = 12;
+    uint32_t accelAvgx = 0, accelAvgy = 0, accelAvgz = 0;
+    uint32_t gyroAvgx  = 0, gyroAvgy  = 0, gyroAvgz  = 0;
+    float_axes_t accelG;   // accel axes in (g) gravity format
+    float_axes_t gyroDPS;  // gyro axes in (DPS) º/s format
     // backup previous configuration
     const uint16_t prevSampleRate      = mpu->getSampleRate(mpu);
     const dlpf_t prevDLPF              = mpu->getDigitalLowPassFilter(mpu);
@@ -2681,12 +2684,15 @@ static esp_err_t getBiases(struct mpu *mpu, accel_fs_t accelFS, gyro_fs_t gyroFS
     }
     // wait for 200ms for sensors to stabilize
     vTaskDelay(200 / portTICK_PERIOD_MS);
+    /*
+    //fifo doesn't work well
     // fill FIFO for 100ms
     if (MPU_ERR_CHECK(mpu->resetFIFO(mpu))) return mpu->err;
     vTaskDelay(100 / portTICK_PERIOD_MS);
-    if (MPU_ERR_CHECK(mpu->setFIFOConfig(mpu, FIFO_CFG_NONE))) return mpu->err;
+    //if (MPU_ERR_CHECK(mpu->setFIFOConfig(mpu, FIFO_CFG_NONE))) return mpu->err;
     // get FIFO count
-    uint16_t fifoCount = mpu->getFIFOCount(mpu);
+    uint16_t fifoCount          = mpu->getFIFOCount(mpu);
+    const    size_t kPacketSize = 12;
     while (fifoCount == 0) {
         //printf("FIFO count = 0, waitting for 100ms\n");
         vTaskDelay(100 / portTICK_PERIOD_MS);
@@ -2702,7 +2708,6 @@ static esp_err_t getBiases(struct mpu *mpu, accel_fs_t accelFS, gyro_fs_t gyroFS
         if (MPU_ERR_CHECK(mpu->readFIFO(mpu, overrunCount, buffer))) return mpu->err;
     }
     // fetch data and add up
-    raw_axes_t accelAvg, gyroAvg;
     for (int i = 0; i < packetCount; i++) {
         if (MPU_ERR_CHECK(mpu->readFIFO(mpu, kPacketSize, buffer))) {
             printf("getBiases read FIFO done size: %d\n", kPacketSize);
@@ -2717,25 +2722,49 @@ static esp_err_t getBiases(struct mpu *mpu, accel_fs_t accelFS, gyro_fs_t gyroFS
         gyroCur.data.y  = (buffer[8] << 8) | buffer[9];
         gyroCur.data.z  = (buffer[10] << 8) | buffer[11];
         // add up
-        accelAvg.data.x += accelCur.data.x;
-        accelAvg.data.y += accelCur.data.y;
-        accelAvg.data.z += accelCur.data.z;
-        gyroAvg.data.x += gyroCur.data.x;
-        gyroAvg.data.y += gyroCur.data.y;
-        gyroAvg.data.z += gyroCur.data.z;
+        accelAvgx += accelCur.data.x;
+        accelAvgy += accelCur.data.y;
+        accelAvgz += accelCur.data.z;
+        gyroAvgx += gyroCur.data.x;
+        gyroAvgy += gyroCur.data.y;
+        gyroAvgz += gyroCur.data.z;
     }
-    // calculate average
-    accelAvg.data.x /= packetCount;
-    accelAvg.data.y /= packetCount;
-    accelAvg.data.z /= packetCount;
-    gyroAvg.data.x /= packetCount;
-    gyroAvg.data.y /= packetCount;
-    gyroAvg.data.z /= packetCount;
+    */
+    raw_axes_t accelRaw;   // x, y, z axes as int16
+    raw_axes_t gyroRaw;    // x, y, z axes as int16
+    const int packetCount = 10;
 
-    float_axes_t accelG  = accelGravity_raw(&accelAvg, accelFS);
-    float_axes_t gyroDPS = gyroDegPerSec_raw(&gyroAvg, gyroFS);
-    printf("[Bias]gyro: [%+7.2f %+7.2f %+7.2f ] (º/s) \t", gyroDPS.xyz[0], gyroDPS.xyz[1], gyroDPS.xyz[2]);
-    printf("[Bias]accel: [%+6.2f %+6.2f %+6.2f ] (G) \t\n", accelG.data.x, accelG.data.y, accelG.data.z);
+    for (int i = 0; i < packetCount; i++) {
+        vTaskDelay(4 / portTICK_PERIOD_MS);
+        mpu->acceleration(mpu, &accelRaw);  // fetch raw data from the registers
+        mpu->rotation(mpu, &gyroRaw);       // fetch raw data from the registers
+        // add up
+        accelAvgx += accelRaw.data.x;
+        accelAvgy += accelRaw.data.y;
+        accelAvgz += accelRaw.data.z;
+        gyroAvgx += gyroRaw.data.x;
+        gyroAvgy += gyroRaw.data.y;
+        gyroAvgz += gyroRaw.data.z;
+
+        float_axes_t accelG1  = accelGravity_raw(&accelRaw, accelFS);
+        float_axes_t gyroDPS1 = gyroDegPerSec_raw(&gyroRaw, gyroFS);
+        ESP_LOGD(ST_TAG, "[sample]gyro: [%+7.2f %+7.2f %+7.2f ] (º/s) \t", gyroDPS1.xyz[0], gyroDPS1.xyz[1], gyroDPS1.xyz[2]);
+        ESP_LOGD(ST_TAG, "[sample]accel: [%+6.2f %+6.2f %+6.2f ] (G) \t\n", accelG1.data.x, accelG1.data.y, accelG1.data.z);
+    }
+    raw_axes_t accelAvg;   // x, y, z axes as int16
+    raw_axes_t gyroAvg;    // x, y, z axes as int16
+    // calculate average
+    accelAvg.data.x = accelAvgx / packetCount;
+    accelAvg.data.y = accelAvgy / packetCount;
+    accelAvg.data.z = accelAvgz / packetCount;
+    gyroAvg.data.x = gyroAvgx / packetCount;
+    gyroAvg.data.y = gyroAvgy / packetCount;
+    gyroAvg.data.z = gyroAvgz / packetCount;
+
+    accelG  = accelGravity_raw(&accelAvg, accelFS);
+    gyroDPS = gyroDegPerSec_raw(&gyroAvg, gyroFS);
+    ESP_LOGD(ST_TAG, "[Bias]gyro: [%+7.2f %+7.2f %+7.2f ] (º/s) \t", gyroDPS.xyz[0], gyroDPS.xyz[1], gyroDPS.xyz[2]);
+    ESP_LOGD(ST_TAG, "[Bias]accel: [%+6.2f %+6.2f %+6.2f ] (G) \t\n", accelG.data.x, accelG.data.y, accelG.data.z);
 
     // remove gravity from Accel Z axis
     const uint16_t gravityLSB = INT16_MAX >> (accelFS + 1);
@@ -2743,8 +2772,8 @@ static esp_err_t getBiases(struct mpu *mpu, accel_fs_t accelFS, gyro_fs_t gyroFS
 
     accelG  = accelGravity_raw(&accelAvg, accelFS);
     gyroDPS = gyroDegPerSec_raw(&gyroAvg, gyroFS);
-    printf("[Bias]gyro: [%+7.2f %+7.2f %+7.2f ] (º/s) \t", gyroDPS.xyz[0], gyroDPS.xyz[1], gyroDPS.xyz[2]);
-    printf("[Bias]accel: [%+6.2f %+6.2f %+6.2f ] (G) \t\n", accelG.data.x, accelG.data.y, accelG.data.z);
+    ESP_LOGD(ST_TAG, "[Bias]gyro: [%+7.2f %+7.2f %+7.2f ] (º/s) \t", gyroDPS.xyz[0], gyroDPS.xyz[1], gyroDPS.xyz[2]);
+    ESP_LOGD(ST_TAG, "[Bias]accel: [%+6.2f %+6.2f %+6.2f ] (G) \t\n", accelG.data.x, accelG.data.y, accelG.data.z);
 
     // save biases
     for (int i = 0; i < 3; i++) {
