@@ -576,23 +576,18 @@ int mpu_write_mem(struct mpu *mpu, unsigned short mem_addr, unsigned short lengt
 {
     unsigned char tmp[2];
 
-    //printf("mpu write mem 01\n");
     if (!data)
         return -1;
 
     tmp[0] = (unsigned char)(mem_addr >> 8);
     tmp[1] = (unsigned char)(mem_addr & 0xFF);
-    //printf("mpu write mem 02\n");
     /* Check bank boundaries. */
     if (tmp[1] + length > 256)
         return -1;
-    //printf("mpu write mem 03\n");
     if (mpu->writeBytes(mpu, bank_sel, 2, tmp))
         return -1;
-    //printf("mpu write mem 04\n");
     if (mpu->writeBytes(mpu, mem_r_w, length, data))
         return -1;
-    //printf("mpu write mem 05\n");
     return 0;
 }
 
@@ -612,20 +607,16 @@ int mpu_read_mem(struct mpu *mpu, unsigned short mem_addr, unsigned short length
 
     if (!data)
         return -1;
-    //printf("mpu read mem 01\n");
     tmp[0] = (unsigned char)(mem_addr >> 8);
     tmp[1] = (unsigned char)(mem_addr & 0xFF);
 
     /* Check bank boundaries. */
     if (tmp[1] + length > 256)
         return -1;
-    //printf("mpu read mem 02\n");
     if (mpu->writeBytes(mpu, bank_sel, 2, tmp))
         return -1;
-    //printf("mpu read mem 03\n");
     if (mpu->readBytes(mpu, mem_r_w, length, data))
         return -1;
-    //printf("mpu read mem 04\n");
     return 0;
 }
 
@@ -689,30 +680,29 @@ int mpu_read_fifo_stream(struct mpu *mpu, unsigned short length, unsigned char *
     unsigned short fifo_count;
 
     if (mpu->readBytes(mpu, FIFO_COUNT_H, 2, tmp)) {
-        printf("mpu_read_fifo_stream read FIFO count failed\n");
+        WK_DEBUGE(ERROR_TAG, "mpu_read_fifo_stream read FIFO count failed\n");
         return -1;
     }
     fifo_count = (tmp[0] << 8) | tmp[1];
     if (fifo_count < length) {
-        //printf("\n fifo count: %d\n", fifo_count);
         more[0] = 0;
         return -1;
     }
     if (fifo_count > (max_fifo >> 1)) {
         /* FIFO is 50% full, better check overflow bit. */
-        printf("mpu_read_fifo_stream: FIFO is 50%% full, better check overflow bit. count: %d\n", fifo_count);
+        WK_DEBUGE(ERROR_TAG, "mpu_read_fifo_stream: FIFO is 50%% full, better check overflow bit. count: %d\n", fifo_count);
         if (mpu->readBytes(mpu, INT_STATUS, 1, tmp)) {
-            printf("mpu_read_fifo_stream: read INT_STATUS failed\n");
+            WK_DEBUGE(ERROR_TAG, "mpu_read_fifo_stream: read INT_STATUS failed\n");
             return -1;
         }
         if (tmp[0] & 0x10) {
-            printf("mpu_read_fifo_stream: fifo overflow, ready to reset fifo\n");
+            WK_DEBUGE(ERROR_TAG, "mpu_read_fifo_stream: fifo overflow, ready to reset fifo\n");
             mpu_reset_fifo(mpu);
             return -2;
         }
     }
     if (mpu->readBytes(mpu, FIFO_R_W, length, data)) {
-        printf("mpu_read_fifo_stream: read FIFO_R_W failed\n");
+        WK_DEBUGE(ERROR_TAG, "mpu_read_fifo_stream: read FIFO_R_W failed\n");
         return -1;
     }
     more[0] = fifo_count / length - 1;
@@ -723,27 +713,27 @@ void tap_cb(unsigned char direction, unsigned char count)
 {
     switch (direction) {
     case TAP_X_UP:
-        printf("Tap X+ ");
+        WK_DEBUGE(ERROR_TAG, "Tap X+ ");
         break;
     case TAP_X_DOWN:
-        printf("Tap X- ");
+        WK_DEBUGE(ERROR_TAG, "Tap X- ");
         break;
     case TAP_Y_UP:
-        printf("Tap Y+ ");
+        WK_DEBUGE(ERROR_TAG, "Tap Y+ ");
         break;
     case TAP_Y_DOWN:
-        printf("Tap Y- ");
+        WK_DEBUGE(ERROR_TAG, "Tap Y- ");
         break;
     case TAP_Z_UP:
-        printf("Tap Z+ ");
+        WK_DEBUGE(ERROR_TAG, "Tap Z+ ");
         break;
     case TAP_Z_DOWN:
-        printf("Tap Z- ");
+        WK_DEBUGE(ERROR_TAG, "Tap Z- ");
         break;
     default:
         return;
     }
-    printf("x%d\n", count);
+    WK_DEBUGE(ERROR_TAG, "x%d\n", count);
     return;
 }
 
@@ -751,16 +741,16 @@ void android_orient_cb(unsigned char orientation)
 {
 	switch (orientation) {
 	case ANDROID_ORIENT_PORTRAIT:
-        printf("Portrait\n");
+        WK_DEBUGE(ERROR_TAG, "Portrait\n");
         break;
 	case ANDROID_ORIENT_LANDSCAPE:
-        printf("Landscape\n");
+        WK_DEBUGE(ERROR_TAG, "Landscape\n");
         break;
 	case ANDROID_ORIENT_REVERSE_PORTRAIT:
-        printf("Reverse Portrait\n");
+        WK_DEBUGE(ERROR_TAG, "Reverse Portrait\n");
         break;
 	case ANDROID_ORIENT_REVERSE_LANDSCAPE:
-        printf("Reverse Landscape\n");
+        WK_DEBUGE(ERROR_TAG, "Reverse Landscape\n");
         break;
 	default:
 		return;
@@ -786,33 +776,26 @@ int mpu_load_firmware(struct mpu *mpu, unsigned short length, const unsigned cha
 
     if (!firmware)
         return -1;
-    //printf("Load firmware 01\n");
     for (ii = 0; ii < length; ii += this_write) {
         this_write = fmin(LOAD_CHUNK, length - ii);
-        //printf("mpu write mem mpu_write_mem\n");
         if (mpu_write_mem(mpu, ii, this_write, (unsigned char*)&firmware[ii]))
             return -1;
-        //printf("mpu write mem mpu_read_mem\n");
         if (mpu_read_mem(mpu, ii, this_write, cur))
             return -1;
-        //printf("mpu write mem memcmp\n");
         if (memcmp(firmware+ii, cur, this_write)) {
-            printf("Loaded firmware read write is defferent\n");
+            WK_DEBUGE(ERROR_TAG, "Loaded firmware read write is defferent\n");
             for (int i = 0; i < this_write; i++) {
-                printf("write: %02x, read: %02x\n", firmware[ii + i], cur[i]);
+                WK_DEBUGE(ERROR_TAG, "write: %02x, read: %02x\n", firmware[ii + i], cur[i]);
             }
             return -2;
         }
-        //printf("mpu write mem memcmp done\n");
     }
-    //printf("Load firmware 02\n");
 
     /* Set program start address. */
     tmp[0] = start_addr >> 8;
     tmp[1] = start_addr & 0xFF;
     if (mpu->writeBytes(mpu, prgm_start_h, 2, tmp))
         return -1;
-    //printf("Load firmware 03\n");
     dmp_loaded = 1;
 
     //TODO: set mpu sample rate to sample_rate
@@ -1593,10 +1576,8 @@ int dmp_read_fifo(struct mpu *mpu, short *gyro, short *accel, long *quat,
     sensors[0] = 0;
 
     /* Get a packet. */
-    //printf("packet length: %d\n", dmp.packet_length);
     while (mpu_read_fifo_stream(mpu, dmp.packet_length, fifo_data, more) != 0)
         ;
-    //printf("dmp_read_fifo: get packet done\n");
 
     /* Parse DMP packet. */
     if (dmp.feature_mask & (DMP_FEATURE_LP_QUAT | DMP_FEATURE_6X_LP_QUAT)) {
@@ -1632,13 +1613,12 @@ int dmp_read_fifo(struct mpu *mpu, short *gyro, short *accel, long *quat,
             /* Quaternion is outside of the acceptable threshold. */
             mpu_reset_fifo(mpu);
             sensors[0] = 0;
-            printf("dmp_read_fifo Quaternion is outside of the acceptable threshold.\n");
+            WK_DEBUGE(ERROR_TAG, "dmp_read_fifo Quaternion is outside of the acceptable threshold.\n");
             return -1;
         }
         sensors[0] |= INV_WXYZ_QUAT;
 #endif
     }
-    //printf("dmp read fifo parse DMP package1 done\n");
     if (dmp.feature_mask & DMP_FEATURE_SEND_RAW_ACCEL) {
         accel[0] = ((short)fifo_data[ii+0] << 8) | fifo_data[ii+1];
         accel[1] = ((short)fifo_data[ii+2] << 8) | fifo_data[ii+3];
@@ -1657,7 +1637,6 @@ int dmp_read_fifo(struct mpu *mpu, short *gyro, short *accel, long *quat,
     /* Gesture data is at the end of the DMP packet. Parse it and call
      * the gesture callbacks (if registered).
      */
-    //printf("dmp read fifo start to decode gesture\n");
     if (dmp.feature_mask & (DMP_FEATURE_TAP | DMP_FEATURE_ANDROID_ORIENT))
         decode_gesture(fifo_data + ii);
 
@@ -1730,19 +1709,8 @@ int dmp_initialize(struct mpu *mpu)
      * be used in combination with DMP_FEATURE_SEND_RAW_GYRO.
      */
 
-    //printf("dmp init start\n");
     if (dmp_load_motion_driver_firmware(mpu)) return -1;
-    //printf("load motion driver firmware done\n");
     if (dmp_set_orientation(mpu, inv_orientation_matrix_to_scalar(gyro_pdata.orientation))) return -2;
-    //printf("dmp_set_orientation done\n");
-
-    //if (dmp_register_tap_cb(tap_cb)) return -3;
-
-    //printf("dmp_register_tap_cb done\n");
-
-    //if (dmp_register_android_orient_cb(android_orient_cb)) return -4;
-
-    //printf("dmp_register_android_orient_cb done\n");
     /*
      * Known Bug -
      * DMP when enabled will sample sensor data at 200Hz and output to FIFO at the rate
@@ -1760,10 +1728,7 @@ int dmp_initialize(struct mpu *mpu)
         DMP_FEATURE_ANDROID_ORIENT | DMP_FEATURE_SEND_RAW_ACCEL | DMP_FEATURE_SEND_CAL_GYRO |
         DMP_FEATURE_GYRO_CAL;
     if (dmp_enable_feature(mpu, dmp_features)) return -5;
-    //printf("dmp_enable_feature done\n");
     if (dmp_set_fifo_rate(mpu, DEFAULT_MPU_HZ)) return -6;
-    //printf("dmp_set_fifo_rate done\n");
-    //mpu_set_dmp_state(mpu, 1);
     dmp_on = 1;
     if (mpu_reset_fifo(mpu)) return -7;
 
@@ -1781,8 +1746,8 @@ esp_err_t mpu_rw_test(struct mpu *mpu)
     mpu_read_mem(mpu, 0, 4, data);
     for (int i = 0; i < 4; i++) {
         if (data[i] != i + 5) {
-            ESP_LOGE(ERROR_TAG, "Read Write Error");
-            ESP_LOGE(ERROR_TAG, "%d %d %d %d\n", data[0], data[1], data[2], data[3]);
+            WK_DEBUGE(ERROR_TAG, "Read Write Error");
+            WK_DEBUGE(ERROR_TAG, "%d %d %d %d\n", data[0], data[1], data[2], data[3]);
             return ESP_FAIL;
         }
     }

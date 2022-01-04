@@ -89,6 +89,7 @@ struct mpu
     esp_err_t (*setSleep)(struct mpu *mpu, bool enable);
     esp_err_t (*testConnection)(struct mpu *mpu);
     esp_err_t (*selfTest)(struct mpu *mpu, selftest_t* result);
+    esp_err_t (*setGyroBias)(struct mpu *mpu);
     esp_err_t (*resetSignalPath)(struct mpu *mpu);
     uint8_t (*whoAmI)(struct mpu *mpu);
     bool (*getSleep)(struct mpu *mpu);

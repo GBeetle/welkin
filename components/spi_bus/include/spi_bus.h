@@ -37,6 +37,7 @@ IN THE SOFTWARE.
  #include "esp_log.h"
  #include "esp_err.h"
  #include "sdkconfig.h"
+ #include "log_sys.h"
 
 // Defaults
 #define SPIBUS_READ     (0x80)  /*!< addr | SPIBUS_READ  */

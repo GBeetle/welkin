@@ -122,6 +122,7 @@ static esp_err_t motion_mag(struct mpu *mpu, raw_axes_t* accel, raw_axes_t* gyro
 #endif //CONFIG_LIS3MDL
 
 static esp_err_t selfTest(struct mpu *mpu, selftest_t* result);
+static esp_err_t setGyroBias(struct mpu *mpu);
 static esp_err_t accelSelfTest(struct mpu *mpu, raw_axes_t* regularBias, raw_axes_t* selfTestBias, uint8_t* result);
 static esp_err_t gyroSelfTest(struct mpu *mpu, raw_axes_t* regularBias, raw_axes_t* selfTestBias, uint8_t* result);
 static esp_err_t getBiases(struct mpu *mpu, accel_fs_t accelFS, gyro_fs_t gyroFS, raw_axes_t* accelBias, raw_axes_t* gyroBias,
@@ -190,8 +191,6 @@ void init_mpu(struct mpu *mpu, mpu_bus_t* bus, mpu_addr_handle_t addr) {
     mpu->addr = addr;
     memset(mpu->buffer, 0xff, 16);
     mpu->err = ESP_OK;
-
-    //printf("$init_mpu data[0] = %d\n", mpu->buffer[0]);
 
     mpu->initialize = &initialize;
     mpu->reset = &reset;
@@ -302,6 +301,7 @@ void init_mpu(struct mpu *mpu, mpu_bus_t* bus, mpu_addr_handle_t addr) {
 #endif
 
     mpu->selfTest = &selfTest;
+    mpu->setGyroBias = &setGyroBias;
     mpu->accelSelfTest = &accelSelfTest;
     mpu->gyroSelfTest = &gyroSelfTest;
     mpu->getBiases = &getBiases;
@@ -372,7 +372,6 @@ static esp_err_t readBits(struct mpu *mpu, uint8_t regAddr, uint8_t bitStart, ui
 /*! Read a single register */
 static esp_err_t readByte(struct mpu *mpu, uint8_t regAddr, uint8_t* data)
 {
-    //printf("$mpu readByte mpu->bus:%d\n", *(int*)((mpu->bus)));
     return mpu->bus->readByte(mpu->bus, mpu->addr, regAddr, data);
 }
 /*! Read data from sequence of registers */
@@ -463,7 +462,7 @@ static esp_err_t initialize(struct mpu *mpu)
     //if (MPU_ERR_CHECK(mpu->setDigitalLowPassFilter(mpu, DLPF_3600HZ_NOLPF))) return mpu->err;
 
     // set Digital Low Pass Filter to get smoother data
-    if (MPU_ERR_CHECK(mpu->setDigitalLowPassFilter(mpu, DLPF_188HZ))) return mpu->err;
+    if (MPU_ERR_CHECK(mpu->setDigitalLowPassFilter(mpu, DLPF_42HZ))) return mpu->err;
     // set sample rate to 1000Hz  from 4Hz - 1kHz
     if (MPU_ERR_CHECK(mpu->setSampleRate(mpu, 250))) return mpu->err;
 
@@ -533,7 +532,6 @@ bool getSleep(struct mpu *mpu)
  * */
 static esp_err_t testConnection(struct mpu *mpu)
 {
-    //printf("$mpu_driver start testConnection data[0] = %d\n", mpu->buffer[0]);
     const uint8_t wai = mpu->whoAmI(mpu);
     if (MPU_ERR_CHECK(mpu->lastError(mpu))) return mpu->err;
 #if defined CONFIG_MPU6000 || defined CONFIG_MPU6050 || defined CONFIG_MPU9150
@@ -554,9 +552,7 @@ static esp_err_t testConnection(struct mpu *mpu)
  */
 uint8_t whoAmI(struct mpu *mpu)
 {
-    //printf("$mpu start whoAmI data[0] = %d\n", mpu->buffer[0]);
     MPU_ERR_CHECK(mpu->readByte(mpu, WHO_AM_I, mpu->buffer));
-    //printf("$mpu end sample\n");
     return mpu->buffer[0];
 }
 
@@ -582,39 +578,34 @@ static esp_err_t setSampleRate(struct mpu *mpu, uint16_t rate)
 {
     // Check value range
     if (rate < 4) {
-        printf("INVALID_SAMPLE_RATE %d, minimum rate is 4", rate);
+        WK_DEBUGE(ERROR_TAG, "INVALID_SAMPLE_RATE %d, minimum rate is 4", rate);
         rate = 4;
     }
     else if (rate > 1000) {
-        printf("INVALID_SAMPLE_RATE %d, maximum rate is 1000", rate);
+        WK_DEBUGE(ERROR_TAG, "INVALID_SAMPLE_RATE %d, maximum rate is 1000", rate);
         rate = 1000;
     }
 
-#if CONFIG_MPU_LOG_LEVEL >= ESP_LOG_WARN
-        // Check selected Fchoice [MPU6500 and MPU9250 only]
 #if defined CONFIG_MPU6500
     fchoice_t fchoice = mpu->getFchoice(mpu);
     if (MPU_ERR_CHECK(mpu->lastError(mpu))) return mpu->err;
     if (fchoice != FCHOICE_3) {
-        printf("INVALID_STATE, sample rate divider is not effective when Fchoice != 3");
+        WK_DEBUGE(ERROR_TAG, "INVALID_STATE, sample rate divider is not effective when Fchoice != 3");
     }
 #endif
     // Check dlpf configuration
     dlpf_t dlpf = mpu->getDigitalLowPassFilter(mpu);
     if (MPU_ERR_CHECK(mpu->lastError(mpu))) return mpu->err;
     if (dlpf == 0 || dlpf == 7)
-        printf("INVALID_STATE, sample rate divider is not effective when DLPF is (0 or 7)");
-#endif
+        WK_DEBUGE(ERROR_TAG, "INVALID_STATE, sample rate divider is not effective when DLPF is (0 or 7)");
 
     const uint16_t internalSampleRate = 1000;
     uint16_t divider                      = internalSampleRate / rate - 1;
     // Check for rate match
     uint16_t finalRate = (internalSampleRate / (1 + divider));
     if (finalRate != rate) {
-        //printf("Sample rate constrained to %d Hz", finalRate);
     }
     else {
-        //printf("Sample rate set to %d Hz", finalRate);
     }
     // Write divider to register
     if (MPU_ERR_CHECK(mpu->writeByte(mpu, SMPLRT_DIV, (uint8_t) divider))) return mpu->err;
@@ -734,7 +725,6 @@ static esp_err_t setLowPowerAccelMode(struct mpu *mpu, bool enable)
 #if defined CONFIG_MPU6500
     fchoice_t fchoice = enable ? FCHOICE_0 : FCHOICE_3;
     if (MPU_ERR_CHECK(mpu->setFchoice(mpu, fchoice))) return mpu->err;
-    //printf("EMPTY, Fchoice set to %d", fchoice);
 #endif
     // read PWR_MGMT1 and PWR_MGMT2 at once
     if (MPU_ERR_CHECK(mpu->readBytes(mpu, PWR_MGMT1, 2, mpu->buffer))) return mpu->err;
@@ -1279,7 +1269,7 @@ static esp_err_t computeOffsets(struct mpu *mpu, raw_axes_t* accel, raw_axes_t* 
     const accel_fs_t kAccelFS = ACCEL_FS_2G;     // most sensitive
     const gyro_fs_t kGyroFS   = GYRO_FS_250DPS;  // most sensitive
     if (MPU_ERR_CHECK(mpu->getBiases(mpu, kAccelFS, kGyroFS, accel, gyro, false))) {
-        printf("[computeOffsets] Error: Failed to get biases\n");
+        WK_DEBUGE(ERROR_TAG, "[computeOffsets] Error: Failed to get biases\n");
         return mpu->err;
     }
     // convert offsets to 16G and 1000DPS format and invert values
@@ -1623,7 +1613,7 @@ static esp_err_t setAuxI2CConfig(struct mpu *mpu, const auxi2c_config_t* config)
         return mpu->err;
     }
     /*
-    printf("EMPTY, Master:: multi_master_en: %d, wait_for_es: %d,"
+    WK_DEBUGE(ERROR_TAG, "EMPTY, Master:: multi_master_en: %d, wait_for_es: %d,"
                 "transition: %d, clock: %d, sample_delay: %d, shadow_delay_en: %d\n",
                 config->multi_master_en, config->wait_for_es, config->transition, config->clock, config->sample_delay,
                 config->shadow_delay_en);
@@ -1714,7 +1704,7 @@ static esp_err_t setAuxI2CSlaveConfig(struct mpu *mpu, const auxi2c_slv_config_t
         return mpu->err;
     }
     /*
-    printf("EMPTY, Slave%d:: r/w: %s, addr: 0x%X, reg_addr: 0x%X, reg_dis: %d, %s: 0x%X, sample_delay_en: %d\n",
+    WKDEBUGE(ERROR_TAG, "EMPTY, Slave%d:: r/w: %s, addr: 0x%X, reg_addr: 0x%X, reg_dis: %d, %s: 0x%X, sample_delay_en: %d\n",
         config->slave, (config->rw == AUXI2C_READ ? "read" : "write"), config->addr, config->reg_addr, config->reg_dis,
         (config->rw == AUXI2C_READ ? "rxlength" : "txdata"), config->txdata, config->sample_delay_en);
     */
@@ -1779,7 +1769,7 @@ static esp_err_t setAuxI2CBypass(struct mpu *mpu, bool enable)
 {
 #ifdef CONFIG_MPU_SPI
     if (enable) {
-        printf("EMPTY, Setting Aux I2C to bypass mode while mpu is connected via SPI");
+        WK_DEBUGE(ERROR_TAG, "EMPTY, Setting Aux I2C to bypass mode while mpu is connected via SPI");
     }
 #endif
     if (enable) {
@@ -1822,15 +1812,13 @@ bool getAuxI2CBypass(struct mpu *mpu)
 static esp_err_t readAuxI2CRxData(struct mpu *mpu, size_t length, uint8_t* data, size_t skip)
 {
     if (length + skip > 24) {
-        printf("INVALID_LENGTH,  %d, mpu has only 24 external sensor data registers!", length);
+        WK_DEBUGE(ERROR_TAG, "INVALID_LENGTH,  %d, mpu has only 24 external sensor data registers!", length);
         return mpu->err = ESP_ERR_INVALID_SIZE;
     }
 // check if I2C Master is enabled, just for warning and debug
-#if CONFIG_MPU_LOG_LEVEL >= ESP_LOG_WARN
     const bool kAuxI2CEnabled = getAuxI2CEnabled(mpu);
     if (MPU_ERR_CHECK(mpu->lastError(mpu))) return mpu->err;
-    if (!kAuxI2CEnabled) printf("AUX_I2C_DISABLED, , better turn on.\n");
-#endif
+    if (!kAuxI2CEnabled) WK_DEBUGE(ERROR_TAG, "AUX_I2C_DISABLED, , better turn on.\n");
     // read the specified amount of registers
     return MPU_ERR_CHECK(mpu->readBytes(mpu, EXT_SENS_DATA_00 + skip, length, data));
 }
@@ -1873,15 +1861,13 @@ auxi2c_stat_t getAuxI2CStatus(struct mpu *mpu)
  * */
 static esp_err_t auxI2CWriteByte(struct mpu *mpu, uint8_t devAddr, uint8_t regAddr, const uint8_t data)
 {
-    //printf("[mwm] start auxI2CWriteByte\n");
     // check for Aux I2C master enabled first
     const bool kAuxI2CEnabled = mpu->getAuxI2CEnabled(mpu);
     if (MPU_ERR_CHECK(mpu->lastError(mpu))) return mpu->err;
     if (!kAuxI2CEnabled) {
-        printf("AUX_I2C_DISABLED, , must enable first\n");
+        WK_DEBUGE(ERROR_TAG, "AUX_I2C_DISABLED, , must enable first\n");
         return mpu->err = ESP_ERR_INVALID_STATE;
     }
-    //printf("[mwm] 0\n");
     // data for I2C_SLV4_ADDR
     mpu->buffer[0] = AUXI2C_WRITE << I2C_SLV_RNW_BIT;
     mpu->buffer[0] |= devAddr & (0x7F);
@@ -1889,35 +1875,28 @@ static esp_err_t auxI2CWriteByte(struct mpu *mpu, uint8_t devAddr, uint8_t regAd
     mpu->buffer[1] = regAddr;
     // data for I2C_SLV4_DO
     mpu->buffer[2] = data;
-    //printf("[mwm] 1\n");
     // write configuration above to slave 4 registers
     if (MPU_ERR_CHECK(mpu->writeBytes(mpu, I2C_SLV4_ADDR, 3, mpu->buffer))) return mpu->err;
     // clear status register before enable this transfer
-    //printf("[mwm] 2\n");
     if (MPU_ERR_CHECK(mpu->readByte(mpu, I2C_MST_STATUS, mpu->buffer + 15))) return mpu->err;
     // enable transfer in slave 4
-    //printf("[mwm] 3\n");
     if (MPU_ERR_CHECK(mpu->writeBit(mpu, I2C_SLV4_CTRL, I2C_SLV4_EN_BIT, 1))) return mpu->err;
     // check status until transfer is done
     TickType_t startTick = xTaskGetTickCount();
     TickType_t endTick   = startTick + pdMS_TO_TICKS(1000);
     auxi2c_stat_t status = 0x00;
-    //printf("[mwm] 4\n");
     do {
-        //printf("[mwm] 5 status: %02x\n", (uint8_t)status);
         if (MPU_ERR_CHECK(mpu->readByte(mpu, I2C_MST_STATUS, &status))) return mpu->err;
         if (status & (1 << I2CMST_STAT_SLV4_NACK_BIT)) {
-            printf("AUX_I2C_SLAVE_NACK, %02x\n", (uint8_t)status);
+            WK_DEBUGE(ERROR_TAG, "AUX_I2C_SLAVE_NACK, %02x\n", (uint8_t)status);
             return mpu->err = ESP_ERR_NOT_FOUND;
         }
-        //printf("[mwm] 6 status: %02x\n", (uint8_t)status);
         if (status & (1 << I2CMST_STAT_LOST_ARB_BIT)) {
-            printf("AUX_I2C_LOST_ARB, ");
+            WK_DEBUGE(ERROR_TAG, "AUX_I2C_LOST_ARB, ");
             return mpu->err = ESP_FAIL;
         }
-        //printf("[mwm] 7\n");
         if (xTaskGetTickCount() >= endTick) {
-            printf("TIMEOUT, . Aux I2C might've hung. Restart it.");
+            WK_DEBUGE(ERROR_TAG, "TIMEOUT, . Aux I2C might've hung. Restart it.");
             return mpu->err = ESP_ERR_TIMEOUT;
         }
     } while (!(status & (1 << I2C_SLV4_DONE_INT_BIT)));
@@ -1940,12 +1919,11 @@ static esp_err_t auxI2CWriteByte(struct mpu *mpu, uint8_t devAddr, uint8_t regAd
  * */
 static esp_err_t auxI2CReadByte(struct mpu *mpu, uint8_t devAddr, uint8_t regAddr, uint8_t* data)
 {
-    //printf("[mwm] start auxI2CReadByte\n");
     // check for Aux I2C master enabled first
     const bool kAuxI2CEnabled = mpu->getAuxI2CEnabled(mpu);
     if (MPU_ERR_CHECK(mpu->lastError(mpu))) return mpu->err;
     if (!kAuxI2CEnabled) {
-        printf("AUX_I2C_DISABLED, , must enable first\n");
+        WK_DEBUGE(ERROR_TAG, "AUX_I2C_DISABLED, , must enable first\n");
         return mpu->err = ESP_ERR_INVALID_STATE;
     }
     // data for I2C_SLV4_ADDR
@@ -1964,20 +1942,17 @@ static esp_err_t auxI2CReadByte(struct mpu *mpu, uint8_t devAddr, uint8_t regAdd
     TickType_t endTick   = startTick + pdMS_TO_TICKS(1000);
     auxi2c_stat_t status = 0x00;
     do {
-        //printf("[mwm] 01 status: %02x\n", (uint8_t)status);
         if (MPU_ERR_CHECK(mpu->readByte(mpu, I2C_MST_STATUS, &status))) return mpu->err;
         if (status & (1 << I2CMST_STAT_SLV4_NACK_BIT)) {
-            printf("AUX_I2C_SLAVE_NACK, %02x\n", (uint8_t)status);
+            WK_DEBUGE(ERROR_TAG, "AUX_I2C_SLAVE_NACK, %02x\n", (uint8_t)status);
             return mpu->err = ESP_ERR_NOT_FOUND;
         }
-        //printf("[mwm] 02 status: %02x\n", (uint8_t)status);
         if (status & (1 << I2CMST_STAT_LOST_ARB_BIT)) {
-            printf("AUX_I2C_LOST_ARB, ");
+            WK_DEBUGE(ERROR_TAG, "AUX_I2C_LOST_ARB, ");
             return mpu->err = ESP_FAIL;
         }
-        //printf("[mwm] 03 status: %02x\n", (uint8_t)status);
         if (xTaskGetTickCount() >= endTick) {
-            printf("TIMEOUT, . Aux I2C might've hung. Restart it.");
+            WK_DEBUGE(ERROR_TAG, "TIMEOUT, . Aux I2C might've hung. Restart it.");
             return mpu->err = ESP_ERR_TIMEOUT;
         }
     } while (!(status & (1 << I2C_SLV4_DONE_INT_BIT)));
@@ -2039,14 +2014,14 @@ static esp_err_t registerDump(struct mpu *mpu, uint8_t start, uint8_t end)
 {
     const uint8_t kNumOfRegs = 128;
     if (end - start < 0 || start >= kNumOfRegs || end >= kNumOfRegs) return mpu->err = ESP_FAIL;
-    printf("LOG_COLOR_W >>  CONFIG_MPU_CHIP_MODEL  register dump: LOG_RESET_COLOR \n");
+    WK_DEBUGE(ERROR_TAG, "LOG_COLOR_W >>  CONFIG_MPU_CHIP_MODEL  register dump: LOG_RESET_COLOR \n");
     uint8_t data;
     for (int i = start; i <= end; i++) {
         if (MPU_ERR_CHECK(mpu->readByte(mpu, i, &data))) {
-            printf("Reading Error.");
+            WK_DEBUGE(ERROR_TAG, "Reading Error.");
             return mpu->err;
         }
-        printf("mpu: reg[ 0x%s%X ]  data( 0x%s%X )\n", i < 0x10 ? "0" : "", i, data < 0x10 ? "0" : "", data);
+        WK_DEBUGE(ERROR_TAG, "mpu: reg[ 0x%s%X ]  data( 0x%s%X )\n", i < 0x10 ? "0" : "", i, data < 0x10 ? "0" : "", data);
     }
     return mpu->err;
 }
@@ -2069,7 +2044,6 @@ static esp_err_t compassReadByte(struct mpu *mpu, uint8_t regAddr, uint8_t* data
     if (kPrevAuxI2CBypassState == false) {
         if (MPU_ERR_CHECK(mpu->setAuxI2CBypass(mpu, true))) return mpu->err;
     }
-    //printf("[I2C compassReadByte reg: %02x\n", regAddr);
     if (MPU_ERR_CHECK(mpu->bus->readByte(mpu->bus, COMPASS_I2CADDRESS, regAddr, data))) return mpu->err;
     if (kPrevAuxI2CBypassState == false) {
         if (MPU_ERR_CHECK(mpu->setAuxI2CBypass(mpu, false))) return mpu->err;
@@ -2175,7 +2149,6 @@ static esp_err_t compassInit(struct mpu *mpu)
     */
 
     if (MPU_ERR_CHECK(mpu->setAuxI2CSlaveEnabled(mpu, MAG_SLAVE_READ_DATA, true))) return mpu->err;
-    //printf("EMPTY, magnetometer mode set to single measurement\n");
 
     // who am i
     compassWhoAmI(mpu);
@@ -2183,13 +2156,12 @@ static esp_err_t compassInit(struct mpu *mpu)
     while (mpu->buffer[0] != LIS3MDL_CHIP_ID) {
         esp_err_t r_error = compassWhoAmI(mpu);
         //esp_err_t w_error = compassReset(mpu);
-        printf("LIS3MDL who am i error: %s\n", esp_err_to_name(r_error));
+        WK_DEBUGE(ERROR_TAG, "LIS3MDL who am i error: %s\n", esp_err_to_name(r_error));
         //if (r_error == w_error) {
         //    return ESP_FAIL;
         //}
     }
     vTaskDelay(50 / portTICK_PERIOD_MS);
-    //printf("This mag chip is LIS3MDL\n");
 
     /* configure the magnetometer */
     //if (MPU_ERR_CHECK(mpu->compassReset(mpu))) return mpu->err;
@@ -2205,7 +2177,6 @@ static esp_err_t compassInit(struct mpu *mpu)
     if (MPU_ERR_CHECK(mpu->setAuxI2CBypass(mpu, false))) return mpu->err;
 #endif
 
-    //printf("Magnetometer configured successfully\n");
     return mpu->err;
 }
 /**
@@ -2281,7 +2252,7 @@ static esp_err_t compassSetSampleMode(struct mpu *mpu, mag_mode_t mode)
     case lis3mdl_low_power:      // low power mode at 0.625 Hz
         break;
     default:
-        printf("[compassSetSampleMode] should never get to here\n");
+        WK_DEBUGE(ERROR_TAG, "[compassSetSampleMode] should never get to here\n");
     }
     MPU_ERR_CHECK(compassWriteByte(mpu, LIS3MDL_REG_CTRL1, ctrl_reg1));
     MPU_ERR_CHECK(compassWriteByte(mpu, LIS3MDL_REG_CTRL4, ctrl_reg4));
@@ -2297,7 +2268,7 @@ static esp_err_t setMagfullScale(struct mpu *mpu, lis3mdl_scale_t scale)
 {
     uint8_t ctrl_reg2;
     if (MPU_ERR_CHECK(compassReadByte(mpu, LIS3MDL_REG_CTRL2, &ctrl_reg2))) {
-        printf("error: setMagfullScale compassReadByte error\n");
+        WK_DEBUGE(ERROR_TAG, "error: setMagfullScale compassReadByte error\n");
     }
     switch (scale) {
     case lis3mdl_scale_4_Gs:
@@ -2315,7 +2286,7 @@ static esp_err_t setMagfullScale(struct mpu *mpu, lis3mdl_scale_t scale)
         ctrl_reg2 |= 0x60;
         break;
     default:
-        printf("[setMagfullScale] should never get to here\n");
+        WK_DEBUGE(ERROR_TAG, "[setMagfullScale] should never get to here\n");
     }
     return MPU_ERR_CHECK(mpu->compassWriteByte(mpu, LIS3MDL_REG_CTRL2, ctrl_reg2));
 }
@@ -2343,7 +2314,7 @@ static esp_err_t compassSetMeasurementMode(struct mpu *mpu, lis3mdl_measurement_
         ctrl_reg3 &= 0xfc;
         break;
     default:
-        printf("[compassSetMeasurementMode] should never get to here\n");
+        WK_DEBUGE(ERROR_TAG, "[compassSetMeasurementMode] should never get to here\n");
     }
     return MPU_ERR_CHECK(mpu->compassWriteByte(mpu, LIS3MDL_REG_CTRL3, ctrl_reg3));
 }
@@ -2424,6 +2395,24 @@ static esp_err_t selfTest(struct mpu *mpu, selftest_t* result)
     return mpu->err;
 }
 
+/**
+ * @brief set gyro bias.
+ * @attention when calling this function, the mpu must remain as horizontal as possible (0 degrees), facing up.
+ * @param result Should be ZERO if gyro and accel passed.
+ * @todo Elaborate doc.
+ * */
+static esp_err_t setGyroBias(struct mpu *mpu)
+{
+    const accel_fs_t kAccelFS = accel_fs;
+    const gyro_fs_t kGyroFS   = gyro_fs;
+    raw_axes_t gyroRegBias, accelRegBias;
+    // get regular biases
+    if (MPU_ERR_CHECK(mpu->getBiases(mpu, kAccelFS, kGyroFS, &accelRegBias, &gyroRegBias, false))) return mpu->err;
+    gyroRegBias.x = -gyroRegBias.x; gyroRegBias.y = -gyroRegBias.y; gyroRegBias.z = -gyroRegBias.z;
+    if (MPU_ERR_CHECK(mpu->setGyroOffset(mpu, gyroRegBias))) return mpu->err;
+    return mpu->err;
+}
+
 #if defined CONFIG_MPU6500
 // Production Self-Test table for MPU6500 based models,
 // used in accel and gyro self-test code below.
@@ -2490,9 +2479,9 @@ static esp_err_t accelSelfTest(struct mpu *mpu, raw_axes_t* regularBias, raw_axe
     /* Convert biases */
     float_axes_t regularBiasGravity  = accelGravity_raw(regularBias, kAccelFS);
     float_axes_t selfTestBiasGravity = accelGravity_raw(selfTestBias, kAccelFS);
-    ESP_LOGD(ST_TAG, "EMPTY, regularBias: %+d %+d %+d | regularBiasGravity: %+.2f %+.2f %+.2f\n", regularBias->data.x,
+    WK_DEBUGD(ST_TAG, "EMPTY, regularBias: %+d %+d %+d | regularBiasGravity: %+.2f %+.2f %+.2f\n", regularBias->data.x,
                 regularBias->data.y, regularBias->data.z, regularBiasGravity.data.x, regularBiasGravity.data.y, regularBiasGravity.data.z);
-    ESP_LOGD(ST_TAG, "EMPTY, selfTestBias: %+d %+d %+d | selfTestBiasGravity: %+.2f %+.2f %+.2f\n", selfTestBias->data.x,
+    WK_DEBUGD(ST_TAG, "EMPTY, selfTestBias: %+d %+d %+d | selfTestBiasGravity: %+.2f %+.2f %+.2f\n", selfTestBias->data.x,
                 selfTestBias->data.y, selfTestBias->data.z, selfTestBiasGravity.data.x, selfTestBiasGravity.data.y, selfTestBiasGravity.data.z);
 
     /* Get OTP production shift code */
@@ -2506,7 +2495,7 @@ static esp_err_t accelSelfTest(struct mpu *mpu, raw_axes_t* regularBias, raw_axe
 #elif defined CONFIG_MPU6500
     if (MPU_ERR_CHECK(mpu->readBytes(mpu, SELF_TEST_X_ACCEL, 3, shiftCode))) return mpu->err;
 #endif
-    ESP_LOGD(ST_TAG, "EMPTY, shiftCode: %+d %+d %+d\n", shiftCode[0], shiftCode[1], shiftCode[2]);
+    WK_DEBUGD(ST_TAG, "EMPTY, shiftCode: %+d %+d %+d\n", shiftCode[0], shiftCode[1], shiftCode[2]);
 
     /* Calulate production shift value */
     float shiftProduction[3] = {0};
@@ -2524,7 +2513,7 @@ static esp_err_t accelSelfTest(struct mpu *mpu, raw_axes_t* regularBias, raw_axe
 #endif
         }
     }
-    ESP_LOGD(ST_TAG, "EMPTY, shiftProduction: %+.2f %+.2f %+.2f\n", shiftProduction[0], shiftProduction[1],
+    WK_DEBUGD(ST_TAG, "EMPTY, shiftProduction: %+.2f %+.2f %+.2f\n", shiftProduction[0], shiftProduction[1],
                 shiftProduction[2]);
 
     /* Evaluate criterias */
@@ -2549,11 +2538,11 @@ static esp_err_t accelSelfTest(struct mpu *mpu, raw_axes_t* regularBias, raw_axe
         if (fabs(regularBiasGravity.xyz[i] > kMaxGravityOffset)) *result |= 1 << i;
 #endif
     }
-    ESP_LOGD(ST_TAG, "EMPTY, shiftResponse: %+.2f %+.2f %+.2f\n", shiftResponse[0], shiftResponse[1], shiftResponse[2]);
-    ESP_LOGD(ST_TAG, "EMPTY, shiftVariation: %+.2f %+.2f %+.2f\n", shiftVariation[0], shiftVariation[1],
+    WK_DEBUGD(ST_TAG, "EMPTY, shiftResponse: %+.2f %+.2f %+.2f\n", shiftResponse[0], shiftResponse[1], shiftResponse[2]);
+    WK_DEBUGD(ST_TAG, "EMPTY, shiftVariation: %+.2f %+.2f %+.2f\n", shiftVariation[0], shiftVariation[1],
                 shiftVariation[2]);
 
-    ESP_LOGD(ST_TAG, "Accel self-test: [X=%s] [Y=%s] [Z=%s]\n", ((*result & 0x1) ? "FAIL" : "OK"),
+    WK_DEBUGD(ST_TAG, "Accel self-test: [X=%s] [Y=%s] [Z=%s]\n", ((*result & 0x1) ? "FAIL" : "OK"),
              ((*result & 0x2) ? "FAIL" : "OK"), ((*result & 0x4) ? "FAIL" : "OK"));
     return mpu->err;
 }
@@ -2583,9 +2572,9 @@ static esp_err_t gyroSelfTest(struct mpu *mpu, raw_axes_t* regularBias, raw_axes
     /* Convert biases */
     float_axes_t regularBiasDPS  = gyroDegPerSec_raw(regularBias, kGyroFS);
     float_axes_t selfTestBiasDPS = gyroDegPerSec_raw(selfTestBias, kGyroFS);
-    ESP_LOGD(ST_TAG, "EMPTY, regularBias: %+d %+d %+d | regularBiasDPS: %+.2f %+.2f %+.2f\n", regularBias->data.x,
+    WK_DEBUGD(ST_TAG, "EMPTY, regularBias: %+d %+d %+d | regularBiasDPS: %+.2f %+.2f %+.2f\n", regularBias->data.x,
                 regularBias->data.y, regularBias->data.z, regularBiasDPS.data.x, regularBiasDPS.data.y, regularBiasDPS.data.z);
-    ESP_LOGD(ST_TAG, "EMPTY, selfTestBias: %+d %+d %+d | selfTestBiasDPS: %+.2f %+.2f %+.2f\n", selfTestBias->data.x,
+    WK_DEBUGD(ST_TAG, "EMPTY, selfTestBias: %+d %+d %+d | selfTestBiasDPS: %+.2f %+.2f %+.2f\n", selfTestBias->data.x,
                 selfTestBias->data.y, selfTestBias->data.z, selfTestBiasDPS.data.x, selfTestBiasDPS.data.y, selfTestBiasDPS.data.z);
 
     /* Get OTP production shift code */
@@ -2599,7 +2588,7 @@ static esp_err_t gyroSelfTest(struct mpu *mpu, raw_axes_t* regularBias, raw_axes
 #elif defined CONFIG_MPU6500
     if (MPU_ERR_CHECK(mpu->readBytes(mpu, SELF_TEST_X_GYRO, 3, shiftCode))) return mpu->err;
 #endif
-    ESP_LOGD(ST_TAG, "EMPTY, shiftCode: %+d %+d %+d\n", shiftCode[0], shiftCode[1], shiftCode[2]);
+    WK_DEBUGD(ST_TAG, "EMPTY, shiftCode: %+d %+d %+d\n", shiftCode[0], shiftCode[1], shiftCode[2]);
 
     /* Calulate production shift value */
     float shiftProduction[3] = {0};
@@ -2615,7 +2604,7 @@ static esp_err_t gyroSelfTest(struct mpu *mpu, raw_axes_t* regularBias, raw_axes
 #endif
         }
     }
-    ESP_LOGD(ST_TAG, "EMPTY, shiftProduction: %+.2f %+.2f %+.2f\n", shiftProduction[0], shiftProduction[1],
+    WK_DEBUGD(ST_TAG, "EMPTY, shiftProduction: %+.2f %+.2f %+.2f\n", shiftProduction[0], shiftProduction[1],
                 shiftProduction[2]);
 
     /* Evaluate criterias */
@@ -2634,11 +2623,11 @@ static esp_err_t gyroSelfTest(struct mpu *mpu, raw_axes_t* regularBias, raw_axes
             *result |= 1 << i;
         }
     }
-    ESP_LOGD(ST_TAG, "EMPTY, shiftResponse: %+.2f %+.2f %+.2f\n", shiftResponse[0], shiftResponse[1], shiftResponse[2]);
-    ESP_LOGD(ST_TAG, "EMPTY, shiftVariation: %+.2f %+.2f %+.2f\n", shiftVariation[0], shiftVariation[1],
+    WK_DEBUGD(ST_TAG, "EMPTY, shiftResponse: %+.2f %+.2f %+.2f\n", shiftResponse[0], shiftResponse[1], shiftResponse[2]);
+    WK_DEBUGD(ST_TAG, "EMPTY, shiftVariation: %+.2f %+.2f %+.2f\n", shiftVariation[0], shiftVariation[1],
                 shiftVariation[2]);
 
-    ESP_LOGD(ST_TAG, "Gyro self-test: [X=%s] [Y=%s] [Z=%s]\n", ((*result & 0x1) ? "FAIL" : "OK"),
+    WK_DEBUGD(ST_TAG, "Gyro self-test: [X=%s] [Y=%s] [Z=%s]\n", ((*result & 0x1) ? "FAIL" : "OK"),
              ((*result & 0x2) ? "FAIL" : "OK"), ((*result & 0x4) ? "FAIL" : "OK"));
     return mpu->err;
 }
@@ -2655,8 +2644,8 @@ static esp_err_t getBiases(struct mpu *mpu, accel_fs_t accelFS, gyro_fs_t gyroFS
     const uint16_t kSampleRate      = 1000;
     const dlpf_t kDLPF              = DLPF_188HZ;
     const fifo_config_t kFIFOConfig = FIFO_CFG_ACCEL | FIFO_CFG_GYRO;
-    uint32_t accelAvgx = 0, accelAvgy = 0, accelAvgz = 0;
-    uint32_t gyroAvgx  = 0, gyroAvgy  = 0, gyroAvgz  = 0;
+    int32_t accelAvgx = 0, accelAvgy = 0, accelAvgz = 0;
+    int32_t gyroAvgx  = 0, gyroAvgy  = 0, gyroAvgz  = 0;
     float_axes_t accelG;   // accel axes in (g) gravity format
     float_axes_t gyroDPS;  // gyro axes in (DPS) º/s format
     // backup previous configuration
@@ -2694,7 +2683,7 @@ static esp_err_t getBiases(struct mpu *mpu, accel_fs_t accelFS, gyro_fs_t gyroFS
     uint16_t fifoCount          = mpu->getFIFOCount(mpu);
     const    size_t kPacketSize = 12;
     while (fifoCount == 0) {
-        //printf("FIFO count = 0, waitting for 100ms\n");
+        //WK_DEBUGE(ERROR_TAG, "FIFO count = 0, waitting for 100ms\n");
         vTaskDelay(100 / portTICK_PERIOD_MS);
         fifoCount = mpu->getFIFOCount(mpu);
     }
@@ -2710,7 +2699,7 @@ static esp_err_t getBiases(struct mpu *mpu, accel_fs_t accelFS, gyro_fs_t gyroFS
     // fetch data and add up
     for (int i = 0; i < packetCount; i++) {
         if (MPU_ERR_CHECK(mpu->readFIFO(mpu, kPacketSize, buffer))) {
-            printf("getBiases read FIFO done size: %d\n", kPacketSize);
+            WK_DEBUGE(ERROR_TAG, "getBiases read FIFO done size: %d\n", kPacketSize);
             return mpu->err;
         }
         // retrieve data
@@ -2748,8 +2737,8 @@ static esp_err_t getBiases(struct mpu *mpu, accel_fs_t accelFS, gyro_fs_t gyroFS
 
         float_axes_t accelG1  = accelGravity_raw(&accelRaw, accelFS);
         float_axes_t gyroDPS1 = gyroDegPerSec_raw(&gyroRaw, gyroFS);
-        ESP_LOGD(ST_TAG, "[sample]gyro: [%+7.2f %+7.2f %+7.2f ] (º/s) \t", gyroDPS1.xyz[0], gyroDPS1.xyz[1], gyroDPS1.xyz[2]);
-        ESP_LOGD(ST_TAG, "[sample]accel: [%+6.2f %+6.2f %+6.2f ] (G) \t\n", accelG1.data.x, accelG1.data.y, accelG1.data.z);
+        WK_DEBUGD(ST_TAG, "[sample]gyro: [%+7.2f %+7.2f %+7.2f ] (º/s) \t", gyroDPS1.xyz[0], gyroDPS1.xyz[1], gyroDPS1.xyz[2]);
+        WK_DEBUGD(ST_TAG, "[sample]accel: [%+6.2f %+6.2f %+6.2f ] (G) \t\n", accelG1.data.x, accelG1.data.y, accelG1.data.z);
     }
     raw_axes_t accelAvg;   // x, y, z axes as int16
     raw_axes_t gyroAvg;    // x, y, z axes as int16
@@ -2763,8 +2752,8 @@ static esp_err_t getBiases(struct mpu *mpu, accel_fs_t accelFS, gyro_fs_t gyroFS
 
     accelG  = accelGravity_raw(&accelAvg, accelFS);
     gyroDPS = gyroDegPerSec_raw(&gyroAvg, gyroFS);
-    ESP_LOGD(ST_TAG, "[Bias]gyro: [%+7.2f %+7.2f %+7.2f ] (º/s) \t", gyroDPS.xyz[0], gyroDPS.xyz[1], gyroDPS.xyz[2]);
-    ESP_LOGD(ST_TAG, "[Bias]accel: [%+6.2f %+6.2f %+6.2f ] (G) \t\n", accelG.data.x, accelG.data.y, accelG.data.z);
+    WK_DEBUGD(ST_TAG, "[Bias]gyro: [%+7.2f %+7.2f %+7.2f ] (º/s) \t", gyroDPS.xyz[0], gyroDPS.xyz[1], gyroDPS.xyz[2]);
+    WK_DEBUGD(ST_TAG, "[Bias]accel: [%+6.2f %+6.2f %+6.2f ] (G) \t\n", accelG.data.x, accelG.data.y, accelG.data.z);
 
     // remove gravity from Accel Z axis
     const uint16_t gravityLSB = INT16_MAX >> (accelFS + 1);
@@ -2772,8 +2761,8 @@ static esp_err_t getBiases(struct mpu *mpu, accel_fs_t accelFS, gyro_fs_t gyroFS
 
     accelG  = accelGravity_raw(&accelAvg, accelFS);
     gyroDPS = gyroDegPerSec_raw(&gyroAvg, gyroFS);
-    ESP_LOGD(ST_TAG, "[Bias]gyro: [%+7.2f %+7.2f %+7.2f ] (º/s) \t", gyroDPS.xyz[0], gyroDPS.xyz[1], gyroDPS.xyz[2]);
-    ESP_LOGD(ST_TAG, "[Bias]accel: [%+6.2f %+6.2f %+6.2f ] (G) \t\n", accelG.data.x, accelG.data.y, accelG.data.z);
+    WK_DEBUGD(ST_TAG, "[Bias]gyro: [%+7.2f %+7.2f %+7.2f ] (º/s) \t", gyroDPS.xyz[0], gyroDPS.xyz[1], gyroDPS.xyz[2]);
+    WK_DEBUGD(ST_TAG, "[Bias]accel: [%+6.2f %+6.2f %+6.2f ] (G) \t\n", accelG.data.x, accelG.data.y, accelG.data.z);
 
     // save biases
     for (int i = 0; i < 3; i++) {
@@ -2787,6 +2776,17 @@ static esp_err_t getBiases(struct mpu *mpu, accel_fs_t accelFS, gyro_fs_t gyroFS
     if (MPU_ERR_CHECK(mpu->setGyroFullScale(mpu, prevGyroFS))) return mpu->err;
     if (MPU_ERR_CHECK(mpu->setFIFOConfig(mpu, prevFIFOConfig))) return mpu->err;
     if (MPU_ERR_CHECK(mpu->setFIFOEnabled(mpu, prevFIFOState))) return mpu->err;
+
+    // reset self test mode
+    if (selftest) {
+        if (MPU_ERR_CHECK(mpu->writeBits(mpu, ACCEL_CONFIG, ACONFIG_XA_ST_BIT, 3, 0x0))) {
+            return mpu->err;
+        }
+        if (MPU_ERR_CHECK(mpu->writeBits(mpu, GYRO_CONFIG, GCONFIG_XG_ST_BIT, 3, 0x0))) {
+            return mpu->err;
+        }
+    }
+
     return mpu->err;
 }
 
@@ -2814,8 +2814,8 @@ static esp_err_t setOffsets(struct mpu *mpu)
 
     if (MPU_ERR_CHECK(mpu->computeOffsets(mpu, &accel, &gyro))) return mpu->err;
 
-    //printf("set Bias gyro: %x, %x, %x\n", gyro.data.x, gyro.data.y, gyro.data.z);
-    //printf("set Bias accel: %x, %x, %x\n", accel.data.x, accel.data.y, accel.data.z);
+    //WK_DEBUGE(ERROR_TAG, "set Bias gyro: %x, %x, %x\n", gyro.data.x, gyro.data.y, gyro.data.z);
+    //WK_DEBUGE(ERROR_TAG, "set Bias accel: %x, %x, %x\n", accel.data.x, accel.data.y, accel.data.z);
     if (MPU_ERR_CHECK(mpu->setGyroOffset(mpu, gyro))) return mpu->err;
     if (MPU_ERR_CHECK(mpu->setAccelOffset(mpu, accel))) return mpu->err;
 
@@ -2824,8 +2824,8 @@ static esp_err_t setOffsets(struct mpu *mpu)
 
     //gyro = mpu->getGyroOffset(mpu);
     //accel = mpu->getAccelOffset(mpu);
-    //printf("get Bias gyro: %x, %x, %x\n", gyro.data.x, gyro.data.y, gyro.data.z);
-    //printf("get Bias accel: %x, %x, %x\n", accel.data.x, accel.data.y, accel.data.z);
+    //WK_DEBUGE(ERROR_TAG, "get Bias gyro: %x, %x, %x\n", gyro.data.x, gyro.data.y, gyro.data.z);
+    //WK_DEBUGE(ERROR_TAG, "get Bias accel: %x, %x, %x\n", accel.data.x, accel.data.y, accel.data.z);
 
     return mpu->err;
 }

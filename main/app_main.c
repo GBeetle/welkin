@@ -100,7 +100,7 @@ static void mpu_get_sensor_data(void* arg)
 
     while (1) {
 #ifndef CONFIG_ANOTIC_DEBUG
-        //ets_printf("[SAMPLE] %u\n", isr_counter);
+        ets_printf("[SAMPLE] %u\n", isr_counter);
 #endif
         if(mpu_isr_manager.mpu_isr_status) {
             // Read
@@ -136,19 +136,19 @@ static void mpu_get_sensor_data(void* arg)
                         sizeof(uint16_t), float2int16(state.attitude.yaw), sizeof(uint8_t), 0x01);
                     break;
                 default:
-                    ESP_LOGE(ERROR_TAG, "wrong command id from uart: %02x\n", rx_command_id);
+                    WK_DEBUGE(ERROR_TAG, "wrong command id from uart: %02x\n", rx_command_id);
             }
             if (rx_command_id >= 0x01 && rx_command_id <= 0x03)
                 uart_write_bytes(UART_NUM_0, (const uint8_t *)send_buffer, send_buffer[3] + 6);
 #else
-            ESP_LOGD(SENSOR_TAG, "roll:%f pitch:%f yaw:%f\n", state.attitude.roll, state.attitude.pitch, state.attitude.yaw);
+            WK_DEBUGD(SENSOR_TAG, "roll:%f pitch:%f yaw:%f\n", state.attitude.roll, state.attitude.pitch, state.attitude.yaw);
 #endif
 
 #ifndef CONFIG_ANOTIC_DEBUG
             // Debug
-            ESP_LOGD(SENSOR_TAG, "gyro: [%+7.2f %+7.2f %+7.2f ] (º/s) \t", gyroDPS.xyz[0], gyroDPS.xyz[1], gyroDPS.xyz[2]);
-            ESP_LOGD(SENSOR_TAG, "accel: [%+6.2f %+6.2f %+6.2f ] (G) \t", accelG.data.x, accelG.data.y, accelG.data.z);
-            ESP_LOGD(SENSOR_TAG, "mag: [%+6.2f %+6.2f %+6.2f ] (Gauss) \n", magDPS.data.x, magDPS.data.y, magDPS.data.z);
+            WK_DEBUGD(SENSOR_TAG, "gyro: [%+7.2f %+7.2f %+7.2f ] (º/s) \t", gyroDPS.xyz[0], gyroDPS.xyz[1], gyroDPS.xyz[2]);
+            WK_DEBUGD(SENSOR_TAG, "accel: [%+6.2f %+6.2f %+6.2f ] (G) \t", accelG.data.x, accelG.data.y, accelG.data.z);
+            WK_DEBUGD(SENSOR_TAG, "mag: [%+6.2f %+6.2f %+6.2f ] (Gauss) \n", magDPS.data.x, magDPS.data.y, magDPS.data.z);
 #endif
             mpu_isr_manager.mpu_isr_status = DATA_NOT_READY;
         }
@@ -173,14 +173,14 @@ static void mpu_get_sensor_data(void* arg)
 static void test(void* arg)
 {
     while (1) {
-        //ets_printf("[test idle task start] prio:[%d]\n", uxTaskPriorityGet(NULL));
+        //WK_DEBUGE(ERROR_TAG, "[test idle task start] prio:[%d]\n", uxTaskPriorityGet(NULL));
         /*
         char task[200];
         vTaskList(task);
-        ets_printf("%s\n",task);
+        WK_DEBUGE(ERROR_TAG, "%s\n",task);
         */
         vTaskDelay(100);
-        //ets_printf("[test idle task end]\n");
+        //WK_DEBUGE(ERROR_TAG, "[test idle task end]\n");
     }
 }
 
@@ -219,7 +219,7 @@ static void uart_rx_task(void *arg)
         /*
         if (rxBytes > 0) {
             data[rxBytes] = 0;
-            ESP_LOGI(RX_TASK_TAG, "Read %d bytes: '%s'", rxBytes, data);
+            WK_DEBUGI(RX_TASK_TAG, "Read %d bytes: '%s'", rxBytes, data);
             ESP_LOG_BUFFER_HEXDUMP(RX_TASK_TAG, data, rxBytes, ESP_LOG_INFO);
         }
         */
@@ -282,26 +282,29 @@ void app_main(void)
     // Great! Let's verify the communication
     // (this also check if the connected MPU supports the implementation of chip selected in the component menu)
     while (mpu.testConnection(&mpu)) {
-        ESP_LOGE(ERROR_TAG, "Failed to connect to the MPU\n");
+        WK_DEBUGE(ERROR_TAG, "Failed to connect to the MPU\n");
         vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
-    //ESP_LOGI(TAG, "MPU connection successful!");
+    //WK_DEBUGI(TAG, "MPU connection successful!");
 
     // Initialize
     ESP_ERROR_CHECK(mpu.initialize(&mpu));  // initialize the chip and set initial configurations
     ESP_ERROR_CHECK(mpu_rw_test(&mpu));
 
+    // test for sensor is good & horizontal
     selftest_t st_result;
     mpu.selfTest(&mpu, &st_result);
     if (st_result != SELF_TEST_PASS) {
         if (st_result == SELF_TEST_GYRO_FAIL)
-            ESP_LOGE(ERROR_TAG, "SELF_TEST_GYRO_FAIL\n");
+            WK_DEBUGE(ERROR_TAG, "SELF_TEST_GYRO_FAIL\n");
         else if (st_result == SELF_TEST_ACCEL_FAIL)
-            ESP_LOGE(ERROR_TAG, "SELF_TEST_ACCEL_FAIL\n");
+            WK_DEBUGE(ERROR_TAG, "SELF_TEST_ACCEL_FAIL\n");
         else
-            ESP_LOGE(ERROR_TAG, "SELT_TEST_FAIL 0x%x\n", (uint8_t)st_result);
+            WK_DEBUGE(ERROR_TAG, "SELT_TEST_FAIL 0x%x\n", (uint8_t)st_result);
         return;
     }
+
+    ESP_ERROR_CHECK(mpu.setGyroBias(&mpu));
 
     //printf("Start to set Offset\n");
     //ESP_ERROR_CHECK(mpu.setOffsets(&mpu));
@@ -356,15 +359,14 @@ void app_main(void)
 
         memset(buffer, 0, kPacketSize);
         while (fifoCount < kPacketSize) {
-            //printf("FIFO count = 0, waitting for 100ms\n");
             fifoCount = mpu.getFIFOCount(&mpu);
         }
-        ESP_LOGD(SENSOR_TAG, "fifo_count: %d\n", fifoCount);
+        WK_DEBUGD(SENSOR_TAG, "fifo_count: %d\n", fifoCount);
         ESP_ERROR_CHECK(mpu.lastError(&mpu));
         const int packetCount = fifoCount / kPacketSize;
         for (int i = 0; i < packetCount; i++) {
             if (MPU_ERR_CHECK(mpu.readFIFO(&mpu, kPacketSize, buffer))) {
-                printf("getBiases read FIFO done size: %d\n", kPacketSize);
+                WK_DEBUGE(ERROR_TAG, "getBiases read FIFO done size: %d\n", kPacketSize);
                 return;
             }
             raw_axes_t accelCur, gyroCur;
@@ -378,8 +380,8 @@ void app_main(void)
 
             float_axes_t accelG  = accelGravity_raw(&accelCur, accel_fs);
             float_axes_t gyroDPS = gyroDegPerSec_raw(&gyroCur, gyro_fs);
-            ESP_LOGD(SENSOR_TAG, "[Bias]gyro: [%+7.2f %+7.2f %+7.2f ] (º/s) \t", gyroDPS.xyz[0], gyroDPS.xyz[1], gyroDPS.xyz[2]);
-            ESP_LOGD(SENSOR_TAG, "[Bias]accel: [%+6.2f %+6.2f %+6.2f ] (G) \t\n", accelG.data.x, accelG.data.y, accelG.data.z);
+            WK_DEBUGD(SENSOR_TAG, "[Bias]gyro: [%+7.2f %+7.2f %+7.2f ] (º/s) \t", gyroDPS.xyz[0], gyroDPS.xyz[1], gyroDPS.xyz[2]);
+            WK_DEBUGD(SENSOR_TAG, "[Bias]accel: [%+6.2f %+6.2f %+6.2f ] (G) \t\n", accelG.data.x, accelG.data.y, accelG.data.z);
         }
         */
 #ifdef MPU_DMP
@@ -413,7 +415,7 @@ void app_main(void)
         memset(quat, 0, 4 * sizeof(long));
 
         if (dmp_read_fifo(&mpu, gyroRaw.xyz, accelRaw.xyz, quat, &sensor_timestamp, &sensors, &more)) {
-            printf("dmp read fifo error\n");
+            WK_DEBUGE(ERROR_TAG, "dmp read fifo error\n");
             //memset(quat, 0, 4 * sizeof(long));
         }
 #ifdef CONFIG_ANOTIC_DEBUG
@@ -429,11 +431,11 @@ void app_main(void)
         magDPS  = magGauss_raw(&magRaw, lis3mdl_scale_12_Gs);
 
         // Debug
-        printf("[gy]: [%+7.2f %+7.2f %+7.2f ] (º/s) \t", gyroDPS.xyz[0], gyroDPS.xyz[1], gyroDPS.xyz[2]);
-        printf("[acc]: [%+6.2f %+6.2f %+6.2f ] (G) \t", accelG.data.x, accelG.data.y, accelG.data.z);
-        printf("[m]: [%+6.2f %+6.2f %+6.2f ] (Gauss) \n", magDPS.data.x, magDPS.data.y, magDPS.data.z);
+        WK_DEBUGE(ERROR_TAG, "[gy]: [%+7.2f %+7.2f %+7.2f ] (º/s) \t", gyroDPS.xyz[0], gyroDPS.xyz[1], gyroDPS.xyz[2]);
+        WK_DEBUGE(ERROR_TAG, "[acc]: [%+6.2f %+6.2f %+6.2f ] (G) \t", accelG.data.x, accelG.data.y, accelG.data.z);
+        WK_DEBUGE(ERROR_TAG, "[m]: [%+6.2f %+6.2f %+6.2f ] (Gauss) \n", magDPS.data.x, magDPS.data.y, magDPS.data.z);
 
-        printf("quat[0]:%ld quat[1]:%ld quat[2]:%ld quat[3]:%ld\n", quat[0], quat[1], quat[2], quat[3]);
+        WK_DEBUGE(ERROR_TAG, "quat[0]:%ld quat[1]:%ld quat[2]:%ld quat[3]:%ld\n", quat[0], quat[1], quat[2], quat[3]);
 #endif
 #endif
     }

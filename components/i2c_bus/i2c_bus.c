@@ -25,18 +25,19 @@ IN THE SOFTWARE.
 #include <stdio.h>
 #include <stdint.h>
 #include "sdkconfig.h"
+#include "log_sys.h"
 
 #define CONFIG_I2CBUS_LOG_READWRITES
 
 
 #if defined   CONFIG_I2CBUS_LOG_RW_LEVEL_INFO
-#define I2CBUS_LOG_RW(format, ...) ESP_LOGI(TAG, format, ##__VA_ARGS__)
+#define I2CBUS_LOG_RW(format, ...) WK_DEBUGI(TAG, format, ##__VA_ARGS__)
 #elif defined CONFIG_I2CBUS_LOG_RW_LEVEL_DEBUG
-#define I2CBUS_LOG_RW(format, ...) ESP_LOGD(TAG, format, ##__VA_ARGS__)
+#define I2CBUS_LOG_RW(format, ...) WK_DEBUGD(TAG, format, ##__VA_ARGS__)
 #elif defined CONFIG_I2CBUS_LOG_RW_LEVEL_VERBOSE
-#define I2CBUS_LOG_RW(format, ...) ESP_LOGV(TAG, format, ##__VA_ARGS__)
+#define I2CBUS_LOG_RW(format, ...) WK_DEBUGV(TAG, format, ##__VA_ARGS__)
 #endif
-#define I2CBUS_LOGE(format, ...)   ESP_LOGE(TAG, format, ##__VA_ARGS__)
+#define I2CBUS_LOGE(format, ...)   WK_DEBUGE(TAG, format, ##__VA_ARGS__)
 
 
 #define I2C_MASTER_ACK_EN   true    /*!< Enable ack check for master */
@@ -183,7 +184,7 @@ static esp_err_t writeBytes(struct i2c *i2c, uint8_t devAddr, uint8_t regAddr, s
         char str[length*5+1];
         for (size_t i = 0; i < length; i++) {
             sprintf(str+i*5, "0x%s%X ", (data[i] < 0x10 ? "0" : ""), data[i]);
-            printf("[port:%d, slave:0x%X] Write %d bytes to register 0x%X, data: %s",
+            WK_DEBUGE(ERROR_TAG, "[port:%d, slave:0x%X] Write %d bytes to register 0x%X, data: %s",
             i2c->port, devAddr, length, regAddr, str);
         }
     }
@@ -240,12 +241,12 @@ static esp_err_t readBytes(struct i2c *i2c, uint8_t devAddr, uint8_t regAddr, si
 #if defined CONFIG_I2CBUS_LOG_READWRITES
     if (!err) {
         char str[length*5+1];
-        for (size_t i = 0; i < length; i++) 
+        for (size_t i = 0; i < length; i++)
             sprintf(str+i*5, "0x%s%X ", (data[i] < 0x10 ? "0" : ""), data[i]);
-        printf("[i2c->port:%d, slave:0x%X] Read_ %d bytes from register 0x%X, data: %s\n", i2c->port, devAddr, length, regAddr, str);
+        WK_DEBUGE(ERROR_TAG, "[i2c->port:%d, slave:0x%X] Read_ %d bytes from register 0x%X, data: %s\n", i2c->port, devAddr, length, regAddr, str);
     }
     else {
-        printf("[i2c->port:%d, slave:0x%X] Failed to read %d bytes from register 0x%X, error: 0x%X\n",
+        WK_DEBUGE(ERROR_TAG, "[i2c->port:%d, slave:0x%X] Failed to read %d bytes from register 0x%X, error: 0x%X\n",
             i2c->port, devAddr, length, regAddr, err);
     }
 #endif
@@ -268,17 +269,17 @@ static esp_err_t testConnection(struct i2c *i2c, uint8_t devAddr, int32_t timeou
 
 static void scanner(struct i2c *i2c) {
     const int32_t scanTimeout = 20;
-    printf(LOG_COLOR_W "\n>> i2c scanning ..." LOG_RESET_COLOR "\n");
+    WK_DEBUGE(ERROR_TAG, "\n>> i2c scanning ..." LOG_RESET_COLOR "\n");
     uint8_t count = 0;
     for (size_t i = 0x3; i < 0x78; i++) {
         if (testConnection(i2c, i, scanTimeout) == ESP_OK) {
-            printf(LOG_COLOR_W "- Device found at address 0x%X%s", i, LOG_RESET_COLOR "\n");
+            WK_DEBUGE(ERROR_TAG, "- Device found at address 0x%X%s", i, LOG_RESET_COLOR "\n");
             count++;
         }
     }
     if (count == 0)
-        printf(LOG_COLOR_E "- No i2c devices found!" LOG_RESET_COLOR "\n");
-    printf("\n");
+        WK_DEBUGE(ERROR_TAG, "- No i2c devices found!" LOG_RESET_COLOR "\n");
+    WK_DEBUGE(ERROR_TAG, "\n");
 }
 
 /* Get default objects */

@@ -52,38 +52,22 @@
 
 #include "lis3mdl.h"
 
-#if defined(LIS3MDL_DEBUG_LEVEL_2)
-#define debug(s, f, ...) printf("%s %s: " s "\n", "LIS3MDL", f, ## __VA_ARGS__)
-#define debug_dev(s, f, d, ...) printf("%s %s: bus %d, addr %02x - " s "\n", "LIS3MDL", f, d->bus, d->addr, ## __VA_ARGS__)
-#else
-#define debug(s, f, ...)
-#define debug_dev(s, f, d, ...)
-#endif
-
-#if defined(LIS3MDL_DEBUG_LEVEL_1) || defined(LIS3MDL_DEBUG_LEVEL_2)
-#define error(s, f, ...) printf("%s %s: " s "\n", "LIS3MDL", f, ## __VA_ARGS__)
-#define error_dev(s, f, d, ...) printf("%s %s: bus %d, addr %02x - " s "\n", "LIS3MDL", f, d->bus, d->addr, ## __VA_ARGS__)
-#else
-#define error(s, f, ...)
-#define error_dev(s, f, d, ...)
-#endif
-
 // register structure definitions
-struct lis3mdl_reg_status 
+struct lis3mdl_reg_status
 {
     uint8_t XDA      :1;    // STATUS<0>   X axis new data available
     uint8_t YDA      :1;    // STATUS<1>   Y axis new data available
     uint8_t ZDA      :1;    // STATUS<2>   Z axis new data available
     uint8_t ZYXDA    :1;    // STATUS<3>   X, Y and Z axis new data available
     uint8_t XOR      :1;    // STATUS<4>   X axis data overrun
-    uint8_t YOR      :1;    // STATUS<5>   Y axis data overrun 
+    uint8_t YOR      :1;    // STATUS<5>   Y axis data overrun
     uint8_t ZOR      :1;    // STATUS<6>   Z axis data overrun
     uint8_t ZYXOR    :1;    // STATUS<7>   X, Y and Z axis data overrun
 };
 
 #define LIS3MDL_ANY_DATA_READY    0x0f    // LIS3MDL_REG_STATUS<3:0>
 
-struct lis3mdl_reg_ctrl1 
+struct lis3mdl_reg_ctrl1
 {
     uint8_t ST       :1;    // CTRL1<0>    Self-test enable
     uint8_t FAST_ODR :1;    // CTRL1<1>    Data rates higher 80 Hz enabled
@@ -92,17 +76,17 @@ struct lis3mdl_reg_ctrl1
     uint8_t TEMP_EN  :1;    // CTRL1<7>    Temperature sensor enabled
 };
 
-struct lis3mdl_reg_ctrl2 
+struct lis3mdl_reg_ctrl2
 {
     uint8_t unused1  :2;    // CTRL2<1:0>  unused
     uint8_t SOFT_RST :1;    // CTRL2<2>    configuration and user regs reset
     uint8_t REBOOT   :1;    // CTRL2<3>    Reboot memory content
     uint8_t unused2  :1;    // CTRL2<4>    unused
-    uint8_t FS       :2;    // CTRL2<6:5>  
+    uint8_t FS       :2;    // CTRL2<6:5>
     uint8_t unused3  :1;    // CTRL2<7>    unused
 };
 
-struct lis3mdl_reg_ctrl3 
+struct lis3mdl_reg_ctrl3
 {
     uint8_t MD       :2;    // CTRL3<1:0>  Operation mode selection
     uint8_t SIM      :1;    // CTRL3<2>    SPI serial interface mode selection
@@ -111,7 +95,7 @@ struct lis3mdl_reg_ctrl3
     uint8_t unused2  :2;    // CTRL3<7:6>  unused
 };
 
-struct lis3mdl_reg_ctrl4 
+struct lis3mdl_reg_ctrl4
 {
     uint8_t unused1  :1;    // CTRL4<0>    unused
     uint8_t BLE      :1;    // CTRL4<1>    Big/litle endian data selection
@@ -119,7 +103,7 @@ struct lis3mdl_reg_ctrl4
     uint8_t unused2  :4;    // CTRL4<7:4>  unused
 };
 
-struct lis3mdl_reg_ctrl5 
+struct lis3mdl_reg_ctrl5
 {
     uint8_t unused   :6;    // CTRL5<5:0>  unused
     uint8_t BDU      :1;    // CTRL5<6>    Block data update

@@ -6,6 +6,7 @@
 #include <stddef.h>
 #include <string.h>
 #include <stdarg.h>
+#include "log_sys.h"
 
 uint8_t __bswap_8(uint8_t value);
 uint16_t float2int16(float value);

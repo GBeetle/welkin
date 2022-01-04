@@ -26,13 +26,13 @@ IN THE SOFTWARE.
 
 
 #if defined   CONFIG_SPIBUS_LOG_RW_LEVEL_INFO
-#define SPIBUS_LOG_RW(format, ... ) ESP_LOGI(TAG, format, ##__VA_ARGS__)
+#define SPIBUS_LOG_RW(format, ... ) WK_DEBUGI(TAG, format, ##__VA_ARGS__)
 #elif defined CONFIG_SPIBUS_LOG_RW_LEVEL_DEBUG
-#define SPIBUS_LOG_RW(format, ... ) ESP_LOGD(TAG, format, ##__VA_ARGS__)
+#define SPIBUS_LOG_RW(format, ... ) WK_DEBUGD(TAG, format, ##__VA_ARGS__)
 #elif defined CONFIG_SPIBUS_LOG_RW_LEVEL_VERBOSE
-#define SPIBUS_LOG_RW(format, ... ) ESP_LOGV(TAG, format, ##__VA_ARGS__)
+#define SPIBUS_LOG_RW(format, ... ) WK_DEBUGV(TAG, format, ##__VA_ARGS__)
 #endif
-#define SPIBUS_LOGE(format, ... )   ESP_LOGE(TAG, format, ##__VA_ARGS__)
+#define SPIBUS_LOGE(format, ... )   WK_DEBUGE(TAG, format, ##__VA_ARGS__)
 
 
 static const char* TAG __attribute__((unused)) = "SPIbus";
@@ -175,11 +175,11 @@ static esp_err_t writeBytes(struct spi *spi, spi_device_handle_t handle, uint8_t
     transaction.rx_buffer = NULL;
     esp_err_t err = spi_device_transmit(handle, &transaction);
 #if defined CONFIG_SPIBUS_LOG_READWRITES
-    if (!err) { 
+    if (!err) {
         char str[length*5+1];
-        for(size_t i = 0; i < length; i++) 
+        for(size_t i = 0; i < length; i++)
             sprintf(str+i*5, "0x%s%X ", (data[i] < 0x10 ? "0" : ""), data[i]);
-        printf("[%s, handle:0x%X] Write %d bytes to__ register 0x%X, data: %s\n", (spi->host == 1 ? "FSPI" : "HSPI"), (uint32_t)handle, length, regAddr, str);
+        WK_DEBUGE(ERROR_TAG, "[%s, handle:0x%X] Write %d bytes to__ register 0x%X, data: %s\n", (spi->host == 1 ? "FSPI" : "HSPI"), (uint32_t)handle, length, regAddr, str);
     }
 #endif
     return err;
@@ -206,13 +206,11 @@ static esp_err_t readBits(struct spi *spi, spi_device_handle_t handle, uint8_t r
 }
 
 static esp_err_t readByte(struct spi *spi, spi_device_handle_t handle, uint8_t regAddr, uint8_t *data) {
-    //printf("$spi_bus readByte\n");
     return spi->readBytes(spi, handle, regAddr, 1, data);
 }
 
 static esp_err_t readBytes(struct spi *spi, spi_device_handle_t handle, uint8_t regAddr, size_t length, uint8_t *data) {
     if(length == 0) return ESP_ERR_INVALID_SIZE;
-    //printf("data[0] = %d\n", data[0]);
     spi_transaction_t transaction;
     transaction.flags = 0;
     transaction.cmd = 0;
@@ -222,14 +220,13 @@ static esp_err_t readBytes(struct spi *spi, spi_device_handle_t handle, uint8_t 
     transaction.user = NULL;
     transaction.tx_buffer = NULL;
     transaction.rx_buffer = data;
-    esp_err_t err = spi_device_transmit(handle, &transaction);    
+    esp_err_t err = spi_device_transmit(handle, &transaction);
 #if defined CONFIG_SPIBUS_LOG_READWRITES
-    if (!err) { 
-        //printf("data[0] = %d\n", data[0]);
-        char str[length*5+1]; 
-        for(size_t i = 0; i < length; i++) 
+    if (!err) {
+        char str[length*5+1];
+        for(size_t i = 0; i < length; i++)
         sprintf(str+i*5, "0x%s%X ", (data[i] < 0x10 ? "0" : ""), data[i]);
-        printf("[%s, handle:0x%X] Read_ %d bytes from register 0x%X, data: %s\n", (spi->host == 1 ? "FHPI" : "HSPI"), (uint32_t)handle, length, regAddr, str);
+        WK_DEBUGE(ERROR_TAG, "[%s, handle:0x%X] Read_ %d bytes from register 0x%X, data: %s\n", (spi->host == 1 ? "FHPI" : "HSPI"), (uint32_t)handle, length, regAddr, str);
     }
 #endif
     return err;

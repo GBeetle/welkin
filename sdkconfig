@@ -1193,8 +1193,14 @@ CONFIG_WPA_MBEDTLS_CRYPTO=y
 #
 # anotic_debug
 #
-# CONFIG_ANOTIC_DEBUG is not set
+CONFIG_ANOTIC_DEBUG=y
 # end of anotic_debug
+
+#
+# error handle
+#
+CONFIG_ERROR_HANDLE=y
+# end of error handle
 
 #
 # i2c_bus

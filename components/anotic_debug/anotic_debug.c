@@ -45,7 +45,7 @@ int anotc_init_data(uint8_t *send_buffer, uint8_t command_id, uint32_t arg_nums,
                 break;
             }
             default: {
-                printf("Wrong format for size: %d\n", size);
+                WK_DEBUGE(ERROR_TAG, "Wrong format for size: %d\n", size);
                 return -1;
             }
         }

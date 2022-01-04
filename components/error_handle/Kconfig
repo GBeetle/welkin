@@ -1,0 +1,7 @@
+menu "error handle"
+
+config ERROR_HANDLE
+    bool "enable error handle system"
+    default "y"
+
+endmenu
