@@ -1735,7 +1735,7 @@ int dmp_initialize(struct mpu *mpu)
     return 0;
 }
 
-esp_err_t mpu_rw_test(struct mpu *mpu)
+WK_RESULT mpu_rw_test(struct mpu *mpu)
 {
     // mpu read/write test
     unsigned char data[4];
@@ -1748,9 +1748,9 @@ esp_err_t mpu_rw_test(struct mpu *mpu)
         if (data[i] != i + 5) {
             WK_DEBUGE(ERROR_TAG, "Read Write Error");
             WK_DEBUGE(ERROR_TAG, "%d %d %d %d\n", data[0], data[1], data[2], data[3]);
-            return ESP_FAIL;
+            return WK_MPU_RW_TEST_FAIL;
         }
     }
-    return ESP_OK;
+    return WK_OK;
 }
 

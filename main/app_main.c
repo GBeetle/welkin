@@ -66,9 +66,7 @@ Pins in use. The SPI Master can use the GPIO mux, so feel free to change these i
 #define MPU_DMP_INT 14
 #define GPIO_INPUT_PIN_SEL  ((1ULL<<MPU_DMP_INT))
 
-#ifdef CONFIG_MPU_SPI
 struct mpu mpu;  // create a default MPU object
-#endif
 
 TaskHandle_t mpu_isr_handle;
 uint32_t isr_counter = 0;
@@ -263,18 +261,17 @@ void app_main(void)
     // Initialize SPI on HSPI host through SPIbus interface:
     init_spi(&fspi, SPI2_HOST);
     // disable SPI DMA in begin
-    ESP_ERROR_CHECK(fspi.begin(&fspi, FSPI_MOSI, FSPI_MISO, FSPI_SCLK, SPI_MAX_DMA_LEN));
-    ESP_ERROR_CHECK(fspi.addDevice(&fspi, 0, SPI_CLOCK_SPEED, FSPI_CS, &mpu_spi_handle));
+    CHK_EXIT(fspi.begin(&fspi, FSPI_MOSI, FSPI_MISO, FSPI_SCLK, SPI_MAX_DMA_LEN));
+    CHK_EXIT(fspi.addDevice(&fspi, 0, SPI_CLOCK_SPEED, FSPI_CS, &mpu_spi_handle));
 
     init_mpu(&mpu, &fspi, mpu_spi_handle);
 #endif
 
 #if defined CONFIG_MPU_I2C
     init_i2c(&i2c0, I2C_NUM_0);
-    ESP_ERROR_CHECK(i2c0.begin(&i2c0, SDA, SCL, I2C_CLOCK_SPEED));
+    CHK_EXIT(i2c0.begin(&i2c0, SDA, SCL, I2C_CLOCK_SPEED));
     mpu_addr_handle_t  MPU_DEFAULT_I2CADDRESS = MPU_I2CADDRESS_AD0_LOW;
 
-    struct mpu mpu;  // create a default MPU object
     init_mpu(&mpu, &i2c0, MPU_DEFAULT_I2CADDRESS);
 #endif
 
@@ -288,8 +285,8 @@ void app_main(void)
     //WK_DEBUGI(TAG, "MPU connection successful!");
 
     // Initialize
-    ESP_ERROR_CHECK(mpu.initialize(&mpu));  // initialize the chip and set initial configurations
-    ESP_ERROR_CHECK(mpu_rw_test(&mpu));
+    CHK_EXIT(mpu.initialize(&mpu));  // initialize the chip and set initial configurations
+    CHK_EXIT(mpu_rw_test(&mpu));
 
     // test for sensor is good & horizontal
     selftest_t st_result;
@@ -304,15 +301,15 @@ void app_main(void)
         return;
     }
 
-    ESP_ERROR_CHECK(mpu.setGyroBias(&mpu));
+    CHK_EXIT(mpu.setGyroBias(&mpu));
 
     //printf("Start to set Offset\n");
-    //ESP_ERROR_CHECK(mpu.setOffsets(&mpu));
+    //CHK_EXIT(mpu.setOffsets(&mpu));
     //raw_axes_t acc;
     //memset(&acc, 0x3f, sizeof(acc));
     //mpu.setGyroOffset(&mpu, acc);
 
-    //ESP_ERROR_CHECK(dmp_initialize(&mpu));
+    //CHK_EXIT(dmp_initialize(&mpu));
 
 #ifdef MPU_INT_ENABLE
     gpio_config_t io_conf;
@@ -344,11 +341,11 @@ void app_main(void)
     const fifo_config_t kFIFOConfig = FIFO_CFG_ACCEL | FIFO_CFG_GYRO;
     const size_t kPacketSize        = 12;
 
-    ESP_ERROR_CHECK(mpu.setFIFOConfig(&mpu, kFIFOConfig));
-    ESP_ERROR_CHECK(mpu.setFIFOEnabled(&mpu, true));
+    CHK_EXIT(mpu.setFIFOConfig(&mpu, kFIFOConfig));
+    CHK_EXIT(mpu.setFIFOEnabled(&mpu, true));
     // wait for 200ms for sensors to stabilize
     vTaskDelay(200 / portTICK_PERIOD_MS);
-    ESP_ERROR_CHECK(mpu.resetFIFO(&mpu));
+    CHK_EXIT(mpu.resetFIFO(&mpu));
     */
 
     while (true) {
@@ -362,7 +359,7 @@ void app_main(void)
             fifoCount = mpu.getFIFOCount(&mpu);
         }
         WK_DEBUGD(SENSOR_TAG, "fifo_count: %d\n", fifoCount);
-        ESP_ERROR_CHECK(mpu.lastError(&mpu));
+        CHK_EXIT(mpu.lastError(&mpu));
         const int packetCount = fifoCount / kPacketSize;
         for (int i = 0; i < packetCount; i++) {
             if (MPU_ERR_CHECK(mpu.readFIFO(&mpu, kPacketSize, buffer))) {

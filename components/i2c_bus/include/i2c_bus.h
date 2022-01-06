@@ -29,6 +29,7 @@ IN THE SOFTWARE.
 #include "driver/gpio.h"
 #include "esp_err.h"
 #include "esp_log.h"
+#include "error_handle.h"
 
 #define I2C_MASTER_TIMEOUT_MS 1000
 
@@ -71,16 +72,16 @@ struct i2c {
      *                       - ESP_ERR_INVALID_ARG Parameter error
      *                       - ESP_FAIL Driver install error
      */
-    esp_err_t (*begin)(struct i2c *i2c, gpio_num_t sda_io_num, gpio_num_t scl_io_num, uint32_t clk_speed);
+    WK_RESULT (*begin)(struct i2c *i2c, gpio_num_t sda_io_num, gpio_num_t scl_io_num, uint32_t clk_speed);
 
-    esp_err_t (*begin_pull_enable)(struct i2c *i2c, gpio_num_t sda_io_num, gpio_num_t scl_io_num,
+    WK_RESULT (*begin_pull_enable)(struct i2c *i2c, gpio_num_t sda_io_num, gpio_num_t scl_io_num,
                     gpio_pullup_t sda_pullup_en, gpio_pullup_t scl_pullup_en,
                     uint32_t clk_speed);
 
     /**
      * Stop i2c bus and unninstall driver
      */
-    esp_err_t (*close)(struct i2c *i2c);
+    WK_RESULT (*close)(struct i2c *i2c);
 
     /**
      * Timeout read and write in milliseconds
@@ -107,10 +108,10 @@ struct i2c {
      *          - ESP_ERR_INVALID_STATE i2c driver not installed or not in master mode.
      *          - ESP_ERR_TIMEOUT Operation timeout because the bus is busy.
      */
-    esp_err_t (*writeBit)(struct i2c *i2c, uint8_t devAddr, uint8_t regAddr, uint8_t bitNum, uint8_t data);
-    esp_err_t (*writeBits)(struct i2c *i2c, uint8_t devAddr, uint8_t regAddr, uint8_t bitStart, uint8_t length, uint8_t data);
-    esp_err_t (*writeByte)(struct i2c *i2c, uint8_t devAddr, uint8_t regAddr, uint8_t data);
-    esp_err_t (*writeBytes)(struct i2c *i2c, uint8_t devAddr, uint8_t regAddr, size_t length, const uint8_t *data);
+    WK_RESULT (*writeBit)(struct i2c *i2c, uint8_t devAddr, uint8_t regAddr, uint8_t bitNum, uint8_t data);
+    WK_RESULT (*writeBits)(struct i2c *i2c, uint8_t devAddr, uint8_t regAddr, uint8_t bitStart, uint8_t length, uint8_t data);
+    WK_RESULT (*writeByte)(struct i2c *i2c, uint8_t devAddr, uint8_t regAddr, uint8_t data);
+    WK_RESULT (*writeBytes)(struct i2c *i2c, uint8_t devAddr, uint8_t regAddr, size_t length, const uint8_t *data);
 
     /**
      * *** READING interface ***
@@ -130,10 +131,10 @@ struct i2c {
      *          - ESP_ERR_INVALID_STATE i2c driver not installed or not in master mode.
      *          - ESP_ERR_TIMEOUT Operation timeout because the bus is busy.]
      */
-    esp_err_t (*readBit)(struct i2c *i2c, uint8_t devAddr, uint8_t regAddr, uint8_t bitNum, uint8_t *data);
-    esp_err_t (*readBits)(struct i2c *i2c, uint8_t devAddr, uint8_t regAddr, uint8_t bitStart, uint8_t length, uint8_t *data);
-    esp_err_t (*readByte)(struct i2c *i2c, uint8_t devAddr, uint8_t regAddr, uint8_t *data);
-    esp_err_t (*readBytes)(struct i2c *i2c, uint8_t devAddr, uint8_t regAddr, size_t length, uint8_t *data);
+    WK_RESULT (*readBit)(struct i2c *i2c, uint8_t devAddr, uint8_t regAddr, uint8_t bitNum, uint8_t *data);
+    WK_RESULT (*readBits)(struct i2c *i2c, uint8_t devAddr, uint8_t regAddr, uint8_t bitStart, uint8_t length, uint8_t *data);
+    WK_RESULT (*readByte)(struct i2c *i2c, uint8_t devAddr, uint8_t regAddr, uint8_t *data);
+    WK_RESULT (*readBytes)(struct i2c *i2c, uint8_t devAddr, uint8_t regAddr, size_t length, uint8_t *data);
 
     /**
      * @brief  Quick check to see if a slave device responds.
@@ -145,7 +146,7 @@ struct i2c {
      *          - ESP_ERR_INVALID_STATE i2c driver not installed or not in master mode.
      *          - ESP_ERR_TIMEOUT Operation timeout because the bus is busy.]
      */
-    esp_err_t (*testConnection)(struct i2c *i2c, uint8_t devAddr, int32_t timeout);
+    WK_RESULT (*testConnection)(struct i2c *i2c, uint8_t devAddr, int32_t timeout);
 
     /**
      * i2c scanner utility, prints out all device addresses found on this i2c bus.

@@ -38,6 +38,7 @@ IN THE SOFTWARE.
  #include "esp_err.h"
  #include "sdkconfig.h"
  #include "log_sys.h"
+ #include "error_handle.h"
 
 // Defaults
 #define SPIBUS_READ     (0x80)  /*!< addr | SPIBUS_READ  */
@@ -71,7 +72,7 @@ struct spi {
      *          - ESP_ERR_NO_MEM        if out of memory
      *          - ESP_OK                on success
      * */
-    esp_err_t (*begin)(struct spi *spi, int mosi_io_num, int miso_io_num, int sclk_io_num, int max_transfer_sz);
+    WK_RESULT (*begin)(struct spi *spi, int mosi_io_num, int miso_io_num, int sclk_io_num, int max_transfer_sz);
 
     /**
      * @brief   Free the spi bus
@@ -80,7 +81,7 @@ struct spi {
      *          - ESP_ERR_INVALID_STATE if not all devices on the bus are freed
      *          - ESP_OK                on success
      * */
-    esp_err_t (*close)(struct spi *spi);
+    WK_RESULT (*close)(struct spi *spi);
 
     /**
      * @brief   Allocate a device on a spi bus. (Up to three devices per peripheral)
@@ -95,14 +96,14 @@ struct spi {
      *          - ESP_ERR_NO_MEM        if out of memory
      *          - ESP_OK                on success
      * */
-    esp_err_t (*addDevice)(struct spi *spi, uint8_t mode, uint32_t clock_speed_hz, int cs_io_num, spi_device_handle_t *handle);
-    esp_err_t (*addDevice_cfg)(struct spi *spi, spi_device_interface_config_t *dev_config, spi_device_handle_t *handle);
-    esp_err_t (*removeDevice)(struct spi *spi, spi_device_handle_t handle);
+    WK_RESULT (*addDevice)(struct spi *spi, uint8_t mode, uint32_t clock_speed_hz, int cs_io_num, spi_device_handle_t *handle);
+    WK_RESULT (*addDevice_cfg)(struct spi *spi, spi_device_interface_config_t *dev_config, spi_device_handle_t *handle);
+    WK_RESULT (*removeDevice)(struct spi *spi, spi_device_handle_t handle);
 
     /**
      * *** WRITING interface ***
      * @brief  spi commands for writing to a 8-bit slave device register.
-     *         All of them returns standard esp_err_t codes. So it can be used
+     *         All of them returns standard WK_RESULT codes. So it can be used
      *         with ESP_ERROR_CHECK();
      * @param  handle    [spi device handle]
      * @param  regAddr   [Register address to write to]
@@ -114,15 +115,15 @@ struct spi {
      * @return  - ESP_ERR_INVALID_ARG   if parameter is invalid
      *          - ESP_OK                on success
      */
-    esp_err_t (*writeBit)(struct spi *spi, spi_device_handle_t handle, uint8_t regAddr, uint8_t bitNum, uint8_t data);
-    esp_err_t (*writeBits)(struct spi *spi, spi_device_handle_t handle, uint8_t regAddr, uint8_t bitStart, uint8_t length, uint8_t data);
-    esp_err_t (*writeByte)(struct spi *spi, spi_device_handle_t handle, uint8_t regAddr, uint8_t data);
-    esp_err_t (*writeBytes)(struct spi *spi, spi_device_handle_t handle, uint8_t regAddr, size_t length, const uint8_t *data);
+    WK_RESULT (*writeBit)(struct spi *spi, spi_device_handle_t handle, uint8_t regAddr, uint8_t bitNum, uint8_t data);
+    WK_RESULT (*writeBits)(struct spi *spi, spi_device_handle_t handle, uint8_t regAddr, uint8_t bitStart, uint8_t length, uint8_t data);
+    WK_RESULT (*writeByte)(struct spi *spi, spi_device_handle_t handle, uint8_t regAddr, uint8_t data);
+    WK_RESULT (*writeBytes)(struct spi *spi, spi_device_handle_t handle, uint8_t regAddr, size_t length, const uint8_t *data);
 
     /**
      * *** READING interface ***
      * @breif  spi commands for reading a 8-bit slave device register.
-     *         All of them returns standard esp_err_t codes.So it can be used
+     *         All of them returns standard WK_RESULT codes.So it can be used
      *         with ESP_ERROR_CHECK();
      * @param  handle    [spi device handle]
      * @param  regAddr   [Register address to read from]
@@ -133,10 +134,10 @@ struct spi {
      * @return  - ESP_ERR_INVALID_ARG   if parameter is invalid
      *          - ESP_OK                on success
      */
-    esp_err_t (*readBit)(struct spi *spi, spi_device_handle_t handle, uint8_t regAddr, uint8_t bitNum, uint8_t *data);
-    esp_err_t (*readBits)(struct spi *spi, spi_device_handle_t handle, uint8_t regAddr, uint8_t bitStart, uint8_t length, uint8_t *data);
-    esp_err_t (*readByte)(struct spi *spi, spi_device_handle_t handle, uint8_t regAddr, uint8_t *data);
-    esp_err_t (*readBytes)(struct spi *spi, spi_device_handle_t handle, uint8_t regAddr, size_t length, uint8_t *data);
+    WK_RESULT (*readBit)(struct spi *spi, spi_device_handle_t handle, uint8_t regAddr, uint8_t bitNum, uint8_t *data);
+    WK_RESULT (*readBits)(struct spi *spi, spi_device_handle_t handle, uint8_t regAddr, uint8_t bitStart, uint8_t length, uint8_t *data);
+    WK_RESULT (*readByte)(struct spi *spi, spi_device_handle_t handle, uint8_t regAddr, uint8_t *data);
+    WK_RESULT (*readBytes)(struct spi *spi, spi_device_handle_t handle, uint8_t regAddr, size_t length, uint8_t *data);
 };
 
 #endif  // end of include guard: _SPIBUS_HPP_

@@ -57,32 +57,32 @@ struct i2c i2c1;
 const uint32_t kDefaultClockSpeed = 100000;  /*!< Clock speed in Hz, default: 100KHz */
 const uint32_t kDefaultTimeout = 1000;       /*!< Timeout in milliseconds, default: 1000ms */
 
-static esp_err_t begin(struct i2c *i2c, gpio_num_t sda_io_num, gpio_num_t scl_io_num, uint32_t clk_speed);
-static esp_err_t begin_pull_enable(struct i2c *i2c, gpio_num_t sda_io_num, gpio_num_t scl_io_num, gpio_pullup_t sda_pullup_en,
+static WK_RESULT begin(struct i2c *i2c, gpio_num_t sda_io_num, gpio_num_t scl_io_num, uint32_t clk_speed);
+static WK_RESULT begin_pull_enable(struct i2c *i2c, gpio_num_t sda_io_num, gpio_num_t scl_io_num, gpio_pullup_t sda_pullup_en,
         gpio_pullup_t scl_pullup_en, uint32_t clk_speed);
-static esp_err_t close(struct i2c *i2c);
+static WK_RESULT close(struct i2c *i2c);
 static void setTimeout(struct i2c *i2c, uint32_t ms);
 /*******************************************************************************
  * WRITING
  ******************************************************************************/
-static esp_err_t writeBit(struct i2c *i2c, uint8_t devAddr, uint8_t regAddr, uint8_t bitNum, uint8_t data);
-static esp_err_t writeBits(struct i2c *i2c, uint8_t devAddr, uint8_t regAddr, uint8_t bitStart, uint8_t length, uint8_t data);
-static esp_err_t writeByte(struct i2c *i2c, uint8_t devAddr, uint8_t regAddr, uint8_t data);
-static esp_err_t writeBytes(struct i2c *i2c, uint8_t devAddr, uint8_t regAddr, size_t length, const uint8_t *data);
+static WK_RESULT writeBit(struct i2c *i2c, uint8_t devAddr, uint8_t regAddr, uint8_t bitNum, uint8_t data);
+static WK_RESULT writeBits(struct i2c *i2c, uint8_t devAddr, uint8_t regAddr, uint8_t bitStart, uint8_t length, uint8_t data);
+static WK_RESULT writeByte(struct i2c *i2c, uint8_t devAddr, uint8_t regAddr, uint8_t data);
+static WK_RESULT writeBytes(struct i2c *i2c, uint8_t devAddr, uint8_t regAddr, size_t length, const uint8_t *data);
 
 /*******************************************************************************
  * READING
  ******************************************************************************/
-static esp_err_t readBit(struct i2c *i2c, uint8_t devAddr, uint8_t regAddr, uint8_t bitNum, uint8_t *data);
-static esp_err_t readBits(struct i2c *i2c, uint8_t devAddr, uint8_t regAddr, uint8_t bitStart, uint8_t length, uint8_t *data);
-static esp_err_t readByte(struct i2c *i2c, uint8_t devAddr, uint8_t regAddr, uint8_t *data);
-static esp_err_t readBytes(struct i2c *i2c, uint8_t devAddr, uint8_t regAddr, size_t length, uint8_t *data);
+static WK_RESULT readBit(struct i2c *i2c, uint8_t devAddr, uint8_t regAddr, uint8_t bitNum, uint8_t *data);
+static WK_RESULT readBits(struct i2c *i2c, uint8_t devAddr, uint8_t regAddr, uint8_t bitStart, uint8_t length, uint8_t *data);
+static WK_RESULT readByte(struct i2c *i2c, uint8_t devAddr, uint8_t regAddr, uint8_t *data);
+static WK_RESULT readBytes(struct i2c *i2c, uint8_t devAddr, uint8_t regAddr, size_t length, uint8_t *data);
 
 
 /*******************************************************************************
  * UTILS
  ******************************************************************************/
-static esp_err_t testConnection(struct i2c *i2c, uint8_t devAddr, int32_t timeout);
+static WK_RESULT testConnection(struct i2c *i2c, uint8_t devAddr, int32_t timeout);
 static void scanner(struct i2c *i2c);
 
 
@@ -113,11 +113,14 @@ void init_i2c(struct i2c *i2c, i2c_port_t port) {
 }
 
 
-static esp_err_t begin(struct i2c *i2c, gpio_num_t sda_io_num, gpio_num_t scl_io_num, uint32_t clk_speed) {
-    return i2c->begin_pull_enable(i2c, sda_io_num, scl_io_num, GPIO_PULLUP_ENABLE, GPIO_PULLUP_ENABLE, kDefaultClockSpeed);
+static WK_RESULT begin(struct i2c *i2c, gpio_num_t sda_io_num, gpio_num_t scl_io_num, uint32_t clk_speed) {
+    WK_RESULT res = WK_OK;
+    CHK_RES(i2c->begin_pull_enable(i2c, sda_io_num, scl_io_num, GPIO_PULLUP_ENABLE, GPIO_PULLUP_ENABLE, kDefaultClockSpeed));
+error_exit:
+    return res;
 }
 
-static esp_err_t begin_pull_enable(struct i2c *i2c, gpio_num_t sda_io_num, gpio_num_t scl_io_num, gpio_pullup_t sda_pullup_en,
+static WK_RESULT begin_pull_enable(struct i2c *i2c, gpio_num_t sda_io_num, gpio_num_t scl_io_num, gpio_pullup_t sda_pullup_en,
         gpio_pullup_t scl_pullup_en, uint32_t clk_speed) {
     i2c_config_t conf;
     conf.mode = I2C_MODE_MASTER;
@@ -128,12 +131,20 @@ static esp_err_t begin_pull_enable(struct i2c *i2c, gpio_num_t sda_io_num, gpio_
     conf.master.clk_speed = clk_speed;
     conf.clk_flags = 0;
     esp_err_t err = i2c_param_config(i2c->port, &conf);
-    if (!err) err = i2c_driver_install(i2c->port, conf.mode, 0, 0, 0);
-    return err;
+    if (!err)
+        err = i2c_driver_install(i2c->port, conf.mode, 0, 0, 0);
+    else
+        return WK_I2C_CFG_FAIL;
+    if (err != ESP_OK)
+        return WK_I2C_INS_FAIL;
+    return WK_OK;
 }
 
-static esp_err_t close(struct i2c *i2c) {
-    return i2c_driver_delete(i2c->port);
+static WK_RESULT close(struct i2c *i2c) {
+    if (i2c_driver_delete(i2c->port) != ESP_OK)
+        return WK_I2C_RMV_FAIL;
+    else
+        return WK_OK;
 }
 
 static void setTimeout(struct i2c *i2c, uint32_t ms) {
@@ -145,31 +156,41 @@ static void setTimeout(struct i2c *i2c, uint32_t ms) {
 /*******************************************************************************
  * WRITING
  ******************************************************************************/
-static esp_err_t writeBit(struct i2c *i2c, uint8_t devAddr, uint8_t regAddr, uint8_t bitNum, uint8_t data) {
+static WK_RESULT writeBit(struct i2c *i2c, uint8_t devAddr, uint8_t regAddr, uint8_t bitNum, uint8_t data) {
     uint8_t buffer;
-    esp_err_t err = i2c->readByte(i2c, devAddr, regAddr, &buffer);
-    if (err) return err;
+    WK_RESULT res = WK_OK;
+
+    CHK_RES(i2c->readByte(i2c, devAddr, regAddr, &buffer));
     buffer = data ? (buffer | (1 << bitNum)) : (buffer & ~(1 << bitNum));
-    return i2c->writeByte(i2c, devAddr, regAddr, buffer);
+    CHK_RES(i2c->writeByte(i2c, devAddr, regAddr, buffer));
+error_exit:
+    return res;
 }
 
-static esp_err_t writeBits(struct i2c *i2c, uint8_t devAddr, uint8_t regAddr, uint8_t bitStart, uint8_t length, uint8_t data) {
+static WK_RESULT writeBits(struct i2c *i2c, uint8_t devAddr, uint8_t regAddr, uint8_t bitStart, uint8_t length, uint8_t data) {
     uint8_t buffer;
-    esp_err_t err = i2c->readByte(i2c, devAddr, regAddr, &buffer);
-    if (err) return err;
+    WK_RESULT res = WK_OK;
+
+    CHK_RES(i2c->readByte(i2c, devAddr, regAddr, &buffer));
     uint8_t mask = ((1 << length) - 1) << (bitStart - length + 1);
     data <<= (bitStart - length + 1);
     data &= mask;
     buffer &= ~mask;
     buffer |= data;
-    return i2c->writeByte(i2c, devAddr, regAddr, buffer);
+    CHK_RES(i2c->writeByte(i2c, devAddr, regAddr, buffer));
+error_exit:
+    return res;
 }
 
-static esp_err_t writeByte(struct i2c *i2c, uint8_t devAddr, uint8_t regAddr, uint8_t data) {
-    return i2c->writeBytes(i2c, devAddr, regAddr, 1, &data);
+static WK_RESULT writeByte(struct i2c *i2c, uint8_t devAddr, uint8_t regAddr, uint8_t data) {
+    WK_RESULT res = WK_OK;
+
+    CHK_RES(i2c->writeBytes(i2c, devAddr, regAddr, 1, &data));
+error_exit:
+    return res;
 }
 
-static esp_err_t writeBytes(struct i2c *i2c, uint8_t devAddr, uint8_t regAddr, size_t length, const uint8_t *data) {
+static WK_RESULT writeBytes(struct i2c *i2c, uint8_t devAddr, uint8_t regAddr, size_t length, const uint8_t *data) {
     i2c_cmd_handle_t cmd = i2c_cmd_link_create();
     int32_t timeout = I2C_MASTER_TIMEOUT_MS;
     i2c_master_start(cmd);
@@ -199,34 +220,45 @@ static esp_err_t writeBytes(struct i2c *i2c, uint8_t devAddr, uint8_t regAddr, s
             i2c->port, devAddr, length, regAddr, err);
     }
 #endif
-    return err;
+    if (err != ESP_OK)
+        return WK_I2C_RW_FAIL;
+    return WK_OK;
 }
 
 
 /*******************************************************************************
  * READING
  ******************************************************************************/
-static esp_err_t readBit(struct i2c *i2c, uint8_t devAddr, uint8_t regAddr, uint8_t bitNum, uint8_t *data) {
-    return i2c->readBits(i2c, devAddr, regAddr, bitNum, 1, data);
+static WK_RESULT readBit(struct i2c *i2c, uint8_t devAddr, uint8_t regAddr, uint8_t bitNum, uint8_t *data) {
+    WK_RESULT res = WK_OK;
+
+    CHK_RES(i2c->readBits(i2c, devAddr, regAddr, bitNum, 1, data));
+error_exit:
+    return res;
 }
 
-static esp_err_t readBits(struct i2c *i2c, uint8_t devAddr, uint8_t regAddr, uint8_t bitStart, uint8_t length, uint8_t *data) {
+static WK_RESULT readBits(struct i2c *i2c, uint8_t devAddr, uint8_t regAddr, uint8_t bitStart, uint8_t length, uint8_t *data) {
     uint8_t buffer;
-    esp_err_t err = i2c->readByte(i2c, devAddr, regAddr, &buffer);
-    if (!err) {
-        uint8_t mask = ((1 << length) - 1) << (bitStart - length + 1);
-        buffer &= mask;
-        buffer >>= (bitStart - length + 1);
-        *data = buffer;
-    }
-    return err;
+    WK_RESULT res = WK_OK;
+
+    CHK_RES(i2c->readByte(i2c, devAddr, regAddr, &buffer));
+    uint8_t mask = ((1 << length) - 1) << (bitStart - length + 1);
+    buffer &= mask;
+    buffer >>= (bitStart - length + 1);
+    *data = buffer;
+error_exit:
+    return res;
 }
 
-static esp_err_t readByte(struct i2c *i2c, uint8_t devAddr, uint8_t regAddr, uint8_t *data) {
-    return i2c->readBytes(i2c, devAddr, regAddr, 1, data);
+static WK_RESULT readByte(struct i2c *i2c, uint8_t devAddr, uint8_t regAddr, uint8_t *data) {
+    WK_RESULT res = WK_OK;
+
+    CHK_RES(i2c->readBytes(i2c, devAddr, regAddr, 1, data));
+error_exit:
+    return res;
 }
 
-static esp_err_t readBytes(struct i2c *i2c, uint8_t devAddr, uint8_t regAddr, size_t length, uint8_t *data) {
+static WK_RESULT readBytes(struct i2c *i2c, uint8_t devAddr, uint8_t regAddr, size_t length, uint8_t *data) {
     i2c_cmd_handle_t cmd = i2c_cmd_link_create();
     int32_t timeout = I2C_MASTER_TIMEOUT_MS;
     i2c_master_start(cmd);
@@ -250,21 +282,25 @@ static esp_err_t readBytes(struct i2c *i2c, uint8_t devAddr, uint8_t regAddr, si
             i2c->port, devAddr, length, regAddr, err);
     }
 #endif
-    return err;
+    if (err != ESP_OK)
+        return WK_I2C_RW_FAIL;
+    return WK_OK;
 }
 
 
 /*******************************************************************************
  * UTILS
  ******************************************************************************/
-static esp_err_t testConnection(struct i2c *i2c, uint8_t devAddr, int32_t timeout) {
+static WK_RESULT testConnection(struct i2c *i2c, uint8_t devAddr, int32_t timeout) {
     i2c_cmd_handle_t cmd = i2c_cmd_link_create();
     i2c_master_start(cmd);
     i2c_master_write_byte(cmd, (devAddr << 1) | I2C_MASTER_WRITE, I2C_MASTER_ACK_EN);
     i2c_master_stop(cmd);
     esp_err_t err = i2c_master_cmd_begin(i2c->port, cmd, (timeout < 0 ? i2c->ticksToWait : pdMS_TO_TICKS(timeout)));
     i2c_cmd_link_delete(cmd);
-    return err;
+    if (err != ESP_OK)
+        return WK_I2C_CONNECT_FAIL;
+    return WK_OK;
 }
 
 static void scanner(struct i2c *i2c) {

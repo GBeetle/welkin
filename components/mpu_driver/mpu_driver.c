@@ -11,123 +11,123 @@
 
 #include "mpu_driver.h"
 
-static esp_err_t initialize(struct mpu *mpu);
-static esp_err_t reset(struct mpu *mpu);
-static esp_err_t setSleep(struct mpu *mpu, bool enable);
+static WK_RESULT initialize(struct mpu *mpu);
+static WK_RESULT reset(struct mpu *mpu);
+static WK_RESULT setSleep(struct mpu *mpu, bool enable);
 static bool getSleep(struct mpu *mpu);
-static esp_err_t testConnection(struct mpu *mpu);
+static WK_RESULT testConnection(struct mpu *mpu);
 static uint8_t whoAmI(struct mpu *mpu);
-static esp_err_t setSampleRate(struct mpu *mpu, uint16_t rate);
+static WK_RESULT setSampleRate(struct mpu *mpu, uint16_t rate);
 static uint16_t getSampleRate(struct mpu *mpu);
-static esp_err_t setClockSource(struct mpu *mpu, clock_src_t clockSrc);
+static WK_RESULT setClockSource(struct mpu *mpu, clock_src_t clockSrc);
 static clock_src_t getClockSource(struct mpu *mpu);
-static esp_err_t setDigitalLowPassFilter(struct mpu *mpu, dlpf_t dlpf);
+static WK_RESULT setDigitalLowPassFilter(struct mpu *mpu, dlpf_t dlpf);
 static dlpf_t getDigitalLowPassFilter(struct mpu *mpu);
-static esp_err_t resetSignalPath(struct mpu *mpu);
-static esp_err_t setLowPowerAccelMode(struct mpu *mpu, bool enable);
+static WK_RESULT resetSignalPath(struct mpu *mpu);
+static WK_RESULT setLowPowerAccelMode(struct mpu *mpu, bool enable);
 static bool getLowPowerAccelMode(struct mpu *mpu);
-static esp_err_t setLowPowerAccelRate(struct mpu *mpu, lp_accel_rate_t rate);
+static WK_RESULT setLowPowerAccelRate(struct mpu *mpu, lp_accel_rate_t rate);
 static lp_accel_rate_t getLowPowerAccelRate(struct mpu *mpu);
-static esp_err_t setMotionFeatureEnabled(struct mpu *mpu, bool enable);
+static WK_RESULT setMotionFeatureEnabled(struct mpu *mpu, bool enable);
 static bool getMotionFeatureEnabled(struct mpu *mpu);
-static esp_err_t setMotionDetectConfig(struct mpu *mpu, mot_config_t* config);
+static WK_RESULT setMotionDetectConfig(struct mpu *mpu, mot_config_t* config);
 static mot_config_t getMotionDetectConfig(struct mpu *mpu);
 #if defined CONFIG_MPU6050
-static esp_err_t setFreeFallConfig(struct mpu *mpu, ff_config_t* config);
+static WK_RESULT setFreeFallConfig(struct mpu *mpu, ff_config_t* config);
 static ff_config_t getFreeFallConfig(struct mpu *mpu);
 static mot_stat_t getMotionDetectStatus(struct mpu *mpu);
 #endif  // MPU6050's stuff
-static esp_err_t setStandbyMode(struct mpu *mpu, stby_en_t mask);
+static WK_RESULT setStandbyMode(struct mpu *mpu, stby_en_t mask);
 static stby_en_t getStandbyMode(struct mpu *mpu);
 
 #if defined CONFIG_MPU6500
-static esp_err_t setFchoice(struct mpu *mpu, fchoice_t fchoice);
+static WK_RESULT setFchoice(struct mpu *mpu, fchoice_t fchoice);
 static fchoice_t getFchoice(struct mpu *mpu);
 #endif
 
-static esp_err_t setGyroFullScale(struct mpu *mpu, gyro_fs_t fsr);
+static WK_RESULT setGyroFullScale(struct mpu *mpu, gyro_fs_t fsr);
 static gyro_fs_t getGyroFullScale(struct mpu *mpu);
-static esp_err_t setAccelFullScale(struct mpu *mpu, accel_fs_t fsr);
+static WK_RESULT setAccelFullScale(struct mpu *mpu, accel_fs_t fsr);
 static accel_fs_t getAccelFullScale(struct mpu *mpu);
-static esp_err_t setGyroOffset(struct mpu *mpu, raw_axes_t bias);
+static WK_RESULT setGyroOffset(struct mpu *mpu, raw_axes_t bias);
 static raw_axes_t getGyroOffset(struct mpu *mpu);
-static esp_err_t setAccelOffset(struct mpu *mpu, raw_axes_t bias);
+static WK_RESULT setAccelOffset(struct mpu *mpu, raw_axes_t bias);
 static raw_axes_t getAccelOffset(struct mpu *mpu);
-static esp_err_t computeOffsets(struct mpu *mpu, raw_axes_t* accel, raw_axes_t* gyro);
-static esp_err_t acceleration(struct mpu *mpu, raw_axes_t* accel);
-static esp_err_t acceleration_xyz(struct mpu *mpu, int16_t* x, int16_t* y, int16_t* z);
-static esp_err_t rotation(struct mpu *mpu, raw_axes_t* gyro);
-static esp_err_t rotation_xyz(struct mpu *mpu, int16_t* x, int16_t* y, int16_t* z);
-static esp_err_t temperature(struct mpu *mpu, int16_t* temp);
-static esp_err_t motion(struct mpu *mpu, raw_axes_t* accel, raw_axes_t* gyro);
-static esp_err_t sensors(struct mpu *mpu, raw_axes_t* accel, raw_axes_t* gyro, int16_t* temp);
-static esp_err_t sensors_sen(struct mpu *mpu, sensors_t* sensors, size_t extsens_len);
+static WK_RESULT computeOffsets(struct mpu *mpu, raw_axes_t* accel, raw_axes_t* gyro);
+static WK_RESULT acceleration(struct mpu *mpu, raw_axes_t* accel);
+static WK_RESULT acceleration_xyz(struct mpu *mpu, int16_t* x, int16_t* y, int16_t* z);
+static WK_RESULT rotation(struct mpu *mpu, raw_axes_t* gyro);
+static WK_RESULT rotation_xyz(struct mpu *mpu, int16_t* x, int16_t* y, int16_t* z);
+static WK_RESULT temperature(struct mpu *mpu, int16_t* temp);
+static WK_RESULT motion(struct mpu *mpu, raw_axes_t* accel, raw_axes_t* gyro);
+static WK_RESULT sensors(struct mpu *mpu, raw_axes_t* accel, raw_axes_t* gyro, int16_t* temp);
+static WK_RESULT sensors_sen(struct mpu *mpu, sensors_t* sensors, size_t extsens_len);
 
 #if defined CONFIG_MPU9150 || (defined CONFIG_MPU6050 && !defined CONFIG_MPU6000)
-static esp_err_t setAuxVDDIOLevel(struct mpu *mpu, auxvddio_lvl_t level);
+static WK_RESULT setAuxVDDIOLevel(struct mpu *mpu, auxvddio_lvl_t level);
 static auxvddio_lvl_t getAuxVDDIOLevel(struct mpu *mpu);
 #endif
 
-static esp_err_t setInterruptConfig(struct mpu *mpu, int_config_t config);
+static WK_RESULT setInterruptConfig(struct mpu *mpu, int_config_t config);
 static int_config_t getInterruptConfig(struct mpu *mpu);
-static esp_err_t setInterruptEnabled(struct mpu *mpu, int_en_t mask);
+static WK_RESULT setInterruptEnabled(struct mpu *mpu, int_en_t mask);
 static int_en_t getInterruptEnabled(struct mpu *mpu);
 static int_stat_t getInterruptStatus(struct mpu *mpu);
-static esp_err_t setFIFOMode(struct mpu *mpu, fifo_mode_t mode);
+static WK_RESULT setFIFOMode(struct mpu *mpu, fifo_mode_t mode);
 static fifo_mode_t getFIFOMode(struct mpu *mpu);
-static esp_err_t setFIFOConfig(struct mpu *mpu, fifo_config_t config);
+static WK_RESULT setFIFOConfig(struct mpu *mpu, fifo_config_t config);
 static fifo_config_t getFIFOConfig(struct mpu *mpu);
-static esp_err_t setFIFOEnabled(struct mpu *mpu, bool enable);
+static WK_RESULT setFIFOEnabled(struct mpu *mpu, bool enable);
 static bool getFIFOEnabled(struct mpu *mpu);
-static esp_err_t resetFIFO(struct mpu *mpu);
+static WK_RESULT resetFIFO(struct mpu *mpu);
 static uint16_t getFIFOCount(struct mpu *mpu);
-static esp_err_t readFIFO(struct mpu *mpu, size_t length, uint8_t* data);
-static esp_err_t writeFIFO(struct mpu *mpu, size_t length, const uint8_t* data);
-static esp_err_t setAuxI2CConfig(struct mpu *mpu, const auxi2c_config_t* config);
+static WK_RESULT readFIFO(struct mpu *mpu, size_t length, uint8_t* data);
+static WK_RESULT writeFIFO(struct mpu *mpu, size_t length, const uint8_t* data);
+static WK_RESULT setAuxI2CConfig(struct mpu *mpu, const auxi2c_config_t* config);
 static auxi2c_config_t getAuxI2CConfig(struct mpu *mpu);
-static esp_err_t setAuxI2CEnabled(struct mpu *mpu, bool enable);
-static esp_err_t setAuxI2CReset(struct mpu *mpu);
+static WK_RESULT setAuxI2CEnabled(struct mpu *mpu, bool enable);
+static WK_RESULT setAuxI2CReset(struct mpu *mpu);
 static bool getAuxI2CEnabled(struct mpu *mpu);
-static esp_err_t setAuxI2CSlaveConfig(struct mpu *mpu, const auxi2c_slv_config_t* config);
+static WK_RESULT setAuxI2CSlaveConfig(struct mpu *mpu, const auxi2c_slv_config_t* config);
 static auxi2c_slv_config_t getAuxI2CSlaveConfig(struct mpu *mpu, auxi2c_slv_t slave);
-static esp_err_t setAuxI2CSlaveEnabled(struct mpu *mpu, auxi2c_slv_t slave, bool enable);
+static WK_RESULT setAuxI2CSlaveEnabled(struct mpu *mpu, auxi2c_slv_t slave, bool enable);
 static bool getAuxI2CSlaveEnabled(struct mpu *mpu, auxi2c_slv_t slave);
-static esp_err_t setAuxI2CBypass(struct mpu *mpu, bool enable);
+static WK_RESULT setAuxI2CBypass(struct mpu *mpu, bool enable);
 static bool getAuxI2CBypass(struct mpu *mpu);
-static esp_err_t readAuxI2CRxData(struct mpu *mpu, size_t length, uint8_t* data, size_t skip);
-static esp_err_t restartAuxI2C(struct mpu *mpu);
+static WK_RESULT readAuxI2CRxData(struct mpu *mpu, size_t length, uint8_t* data, size_t skip);
+static WK_RESULT restartAuxI2C(struct mpu *mpu);
 static auxi2c_stat_t getAuxI2CStatus(struct mpu *mpu);
-static esp_err_t auxI2CWriteByte(struct mpu *mpu, uint8_t devAddr, uint8_t regAddr, const uint8_t data);
-static esp_err_t auxI2CReadByte(struct mpu *mpu, uint8_t devAddr, uint8_t regAddr, uint8_t* data);
-static esp_err_t setFsyncConfig(struct mpu *mpu, int_lvl_t level);
+static WK_RESULT auxI2CWriteByte(struct mpu *mpu, uint8_t devAddr, uint8_t regAddr, const uint8_t data);
+static WK_RESULT auxI2CReadByte(struct mpu *mpu, uint8_t devAddr, uint8_t regAddr, uint8_t* data);
+static WK_RESULT setFsyncConfig(struct mpu *mpu, int_lvl_t level);
 static int_lvl_t getFsyncConfig(struct mpu *mpu);
-static esp_err_t setFsyncEnabled(struct mpu *mpu, bool enable);
+static WK_RESULT setFsyncEnabled(struct mpu *mpu, bool enable);
 static bool getFsyncEnabled(struct mpu *mpu);
-static esp_err_t registerDump(struct mpu *mpu, uint8_t start, uint8_t end);
+static WK_RESULT registerDump(struct mpu *mpu, uint8_t start, uint8_t end);
 
 #if defined CONFIG_LIS3MDL
-static esp_err_t compassInit(struct mpu *mpu);
-static esp_err_t compassWhoAmI(struct mpu *mpu);
-static esp_err_t compassReset(struct mpu *mpu);
-static esp_err_t compassReadByte(struct mpu *mpu, uint8_t regAddr, uint8_t* data);
-static esp_err_t compassWriteByte(struct mpu *mpu, uint8_t regAddr, uint8_t data);
-static esp_err_t compassSetMeasurementMode(struct mpu *mpu, lis3mdl_measurement_mode_t mode);
-static esp_err_t compassSetSampleMode(struct mpu *mpu, mag_mode_t mode);
-static esp_err_t setMagfullScale(struct mpu *mpu, lis3mdl_scale_t scale);
+static WK_RESULT compassInit(struct mpu *mpu);
+static WK_RESULT compassWhoAmI(struct mpu *mpu);
+static WK_RESULT compassReset(struct mpu *mpu);
+static WK_RESULT compassReadByte(struct mpu *mpu, uint8_t regAddr, uint8_t* data);
+static WK_RESULT compassWriteByte(struct mpu *mpu, uint8_t regAddr, uint8_t data);
+static WK_RESULT compassSetMeasurementMode(struct mpu *mpu, lis3mdl_measurement_mode_t mode);
+static WK_RESULT compassSetSampleMode(struct mpu *mpu, mag_mode_t mode);
+static WK_RESULT setMagfullScale(struct mpu *mpu, lis3mdl_scale_t scale);
 
-static esp_err_t heading(struct mpu *mpu, raw_axes_t* mag);
-static esp_err_t heading_xyz(struct mpu *mpu, int16_t* x, int16_t* y, int16_t* z);
-static esp_err_t motion_mag(struct mpu *mpu, raw_axes_t* accel, raw_axes_t* gyro, raw_axes_t* mag);
+static WK_RESULT heading(struct mpu *mpu, raw_axes_t* mag);
+static WK_RESULT heading_xyz(struct mpu *mpu, int16_t* x, int16_t* y, int16_t* z);
+static WK_RESULT motion_mag(struct mpu *mpu, raw_axes_t* accel, raw_axes_t* gyro, raw_axes_t* mag);
 //static bool compassSelfTest(struct mpu *mpu, raw_axes_t* result);
 #endif //CONFIG_LIS3MDL
 
-static esp_err_t selfTest(struct mpu *mpu, selftest_t* result);
-static esp_err_t setGyroBias(struct mpu *mpu);
-static esp_err_t accelSelfTest(struct mpu *mpu, raw_axes_t* regularBias, raw_axes_t* selfTestBias, uint8_t* result);
-static esp_err_t gyroSelfTest(struct mpu *mpu, raw_axes_t* regularBias, raw_axes_t* selfTestBias, uint8_t* result);
-static esp_err_t getBiases(struct mpu *mpu, accel_fs_t accelFS, gyro_fs_t gyroFS, raw_axes_t* accelBias, raw_axes_t* gyroBias,
+static WK_RESULT selfTest(struct mpu *mpu, selftest_t* result);
+static WK_RESULT setGyroBias(struct mpu *mpu);
+static WK_RESULT accelSelfTest(struct mpu *mpu, raw_axes_t* regularBias, raw_axes_t* selfTestBias, uint8_t* result);
+static WK_RESULT gyroSelfTest(struct mpu *mpu, raw_axes_t* regularBias, raw_axes_t* selfTestBias, uint8_t* result);
+static WK_RESULT getBiases(struct mpu *mpu, accel_fs_t accelFS, gyro_fs_t gyroFS, raw_axes_t* accelBias, raw_axes_t* gyroBias,
                          bool selftest);
-static esp_err_t setOffsets(struct mpu *mpu);
+static WK_RESULT setOffsets(struct mpu *mpu);
 
 const accel_fs_t accel_fs = ACCEL_FS_16G;
 const gyro_fs_t gyro_fs = GYRO_FS_2000DPS;
@@ -159,23 +159,23 @@ static struct mpu* setAddr(struct mpu *mpu, mpu_addr_handle_t addr);
  */
 static mpu_addr_handle_t getAddr(struct mpu *mpu);
 /*! Return last error code. */
-static esp_err_t lastError(struct mpu *mpu);
+static WK_RESULT lastError(struct mpu *mpu);
 /*! Read a single bit from a register*/
-static esp_err_t readBit(struct mpu *mpu, uint8_t regAddr, uint8_t bitNum, uint8_t* data);
+static WK_RESULT readBit(struct mpu *mpu, uint8_t regAddr, uint8_t bitNum, uint8_t* data);
 /*! Read a range of bits from a register */
-static esp_err_t readBits(struct mpu *mpu, uint8_t regAddr, uint8_t bitStart, uint8_t length, uint8_t* data);
+static WK_RESULT readBits(struct mpu *mpu, uint8_t regAddr, uint8_t bitStart, uint8_t length, uint8_t* data);
 /*! Read a single register */
-static esp_err_t readByte(struct mpu *mpu, uint8_t regAddr, uint8_t* data);
+static WK_RESULT readByte(struct mpu *mpu, uint8_t regAddr, uint8_t* data);
 /*! Read data from sequence of registers */
-static esp_err_t readBytes(struct mpu *mpu, uint8_t regAddr, size_t length, uint8_t* data);
+static WK_RESULT readBytes(struct mpu *mpu, uint8_t regAddr, size_t length, uint8_t* data);
 /*! Write a single bit to a register */
-static esp_err_t writeBit(struct mpu *mpu, uint8_t regAddr, uint8_t bitNum, uint8_t data);
+static WK_RESULT writeBit(struct mpu *mpu, uint8_t regAddr, uint8_t bitNum, uint8_t data);
 /*! Write a range of bits to a register */
-static esp_err_t writeBits(struct mpu *mpu, uint8_t regAddr, uint8_t bitStart, uint8_t length, uint8_t data);
+static WK_RESULT writeBits(struct mpu *mpu, uint8_t regAddr, uint8_t bitStart, uint8_t length, uint8_t data);
 /*! Write a value to a register */
-static esp_err_t writeByte(struct mpu *mpu, uint8_t regAddr, uint8_t data);
+static WK_RESULT writeByte(struct mpu *mpu, uint8_t regAddr, uint8_t data);
 /*! Write a sequence to data to a sequence of registers */
-static esp_err_t writeBytes(struct mpu *mpu, uint8_t regAddr, size_t length, const uint8_t* data);
+static WK_RESULT writeBytes(struct mpu *mpu, uint8_t regAddr, size_t length, const uint8_t* data);
 
 // ==============
 // Inline methods
@@ -355,47 +355,47 @@ static mpu_addr_handle_t getAddr(struct mpu *mpu)
     return mpu->addr;
 }
 /*! Return last error code. */
-static esp_err_t lastError(struct mpu *mpu)
+static WK_RESULT lastError(struct mpu *mpu)
 {
     return mpu->err;
 }
 /*! Read a single bit from a register*/
-static esp_err_t readBit(struct mpu *mpu, uint8_t regAddr, uint8_t bitNum, uint8_t* data)
+static WK_RESULT readBit(struct mpu *mpu, uint8_t regAddr, uint8_t bitNum, uint8_t* data)
 {
     return mpu->bus->readBit(mpu->bus, mpu->addr, regAddr, bitNum, data);
 }
 /*! Read a range of bits from a register */
-static esp_err_t readBits(struct mpu *mpu, uint8_t regAddr, uint8_t bitStart, uint8_t length, uint8_t* data)
+static WK_RESULT readBits(struct mpu *mpu, uint8_t regAddr, uint8_t bitStart, uint8_t length, uint8_t* data)
 {
     return mpu->bus->readBits(mpu->bus, mpu->addr, regAddr, bitStart, length, data);
 }
 /*! Read a single register */
-static esp_err_t readByte(struct mpu *mpu, uint8_t regAddr, uint8_t* data)
+static WK_RESULT readByte(struct mpu *mpu, uint8_t regAddr, uint8_t* data)
 {
     return mpu->bus->readByte(mpu->bus, mpu->addr, regAddr, data);
 }
 /*! Read data from sequence of registers */
-static esp_err_t readBytes(struct mpu *mpu, uint8_t regAddr, size_t length, uint8_t* data)
+static WK_RESULT readBytes(struct mpu *mpu, uint8_t regAddr, size_t length, uint8_t* data)
 {
     return mpu->bus->readBytes(mpu->bus, mpu->addr, regAddr, length, data);
 }
 /*! Write a single bit to a register */
-static esp_err_t writeBit(struct mpu *mpu, uint8_t regAddr, uint8_t bitNum, uint8_t data)
+static WK_RESULT writeBit(struct mpu *mpu, uint8_t regAddr, uint8_t bitNum, uint8_t data)
 {
     return mpu->bus->writeBit(mpu->bus, mpu->addr, regAddr, bitNum, data);
 }
 /*! Write a range of bits to a register */
-static esp_err_t writeBits(struct mpu *mpu, uint8_t regAddr, uint8_t bitStart, uint8_t length, uint8_t data)
+static WK_RESULT writeBits(struct mpu *mpu, uint8_t regAddr, uint8_t bitStart, uint8_t length, uint8_t data)
 {
     return mpu->bus->writeBits(mpu->bus, mpu->addr, regAddr, bitStart, length, data);
 }
 /*! Write a value to a register */
-static esp_err_t writeByte(struct mpu *mpu, uint8_t regAddr, uint8_t data)
+static WK_RESULT writeByte(struct mpu *mpu, uint8_t regAddr, uint8_t data)
 {
     return mpu->bus->writeByte(mpu->bus, mpu->addr, regAddr, data);
 }
 /*! Write a sequence to data to a sequence of registers */
-static esp_err_t writeBytes(struct mpu *mpu, uint8_t regAddr, size_t length, const uint8_t* data)
+static WK_RESULT writeBytes(struct mpu *mpu, uint8_t regAddr, size_t length, const uint8_t* data)
 {
     return mpu->bus->writeBytes(mpu->bus, mpu->addr, regAddr, length, data);
 }
@@ -419,52 +419,50 @@ static esp_err_t writeBytes(struct mpu *mpu, uint8_t regAddr, size_t length, con
  *  - A soft reset is performed first, which takes 100-200ms.
  *  - When using SPI, the primary I2C Slave module is disabled right away.
  * */
-static esp_err_t initialize(struct mpu *mpu)
+static WK_RESULT initialize(struct mpu *mpu)
 {
+    WK_RESULT res = WK_OK;
     // reset device (wait a little to clear all registers)
-    if (MPU_ERR_CHECK(mpu->reset(mpu))) return mpu->err;
+    CHK_RES(mpu->reset(mpu));
     vTaskDelay(100 / portTICK_PERIOD_MS);
     // wake-up the device (power on-reset state is asleep for some models)
-    if (MPU_ERR_CHECK(mpu->setSleep(mpu, false))) return mpu->err;
+    CHK_RES(mpu->setSleep(mpu, false));
     // disable mpu's I2C slave module when using SPI
 #ifdef CONFIG_MPU_SPI
-    if (MPU_ERR_CHECK(mpu->writeBit(mpu, USER_CTRL, USERCTRL_I2C_IF_DIS_BIT, 1))) return mpu->err;
+    CHK_RES(mpu->writeBit(mpu, USER_CTRL, USERCTRL_I2C_IF_DIS_BIT, 1));
 #endif
     // set clock source to gyro PLL which is better than internal clock
-    if (MPU_ERR_CHECK(mpu->setClockSource(mpu, CLOCK_PLL))) return mpu->err;
+    CHK_RES(mpu->setClockSource(mpu, CLOCK_PLL));
 
 #if defined CONFIG_MPU6500
     // MPU6500 / MPU9250 share 4kB of memory between the DMP and the FIFO. Since the
     // first 3kB are needed by the DMP, we'll use the last 1kB for the FIFO.
-    if (MPU_ERR_CHECK(mpu->writeBits(mpu, ACCEL_CONFIG2, ACONFIG2_FIFO_SIZE_BIT, ACONFIG2_FIFO_SIZE_LENGTH,
-                                FIFO_SIZE_1K))) {
-        return mpu->err;
-    }
+    CHK_RES(mpu->writeBits(mpu, ACCEL_CONFIG2, ACONFIG2_FIFO_SIZE_BIT, ACONFIG2_FIFO_SIZE_LENGTH, FIFO_SIZE_1K));
 #endif
 
     // set Full Scale range
-    if (MPU_ERR_CHECK(mpu->setGyroFullScale(mpu, gyro_fs))) return mpu->err;
-    if (MPU_ERR_CHECK(mpu->setAccelFullScale(mpu, accel_fs))) return mpu->err;
+    CHK_RES(mpu->setGyroFullScale(mpu, gyro_fs));
+    CHK_RES(mpu->setAccelFullScale(mpu, accel_fs));
 
     vTaskDelay(50 / portTICK_PERIOD_MS);
 
 #if defined CONFIG_LIS3MDL
     compass_enabled = 1;
-    if (MPU_ERR_CHECK(mpu->compassInit(mpu))) return mpu->err;
+    CHK_RES(mpu->compassInit(mpu));
     imuInit();
 #endif
 
     // set gyro to 32kHz fchoice 0 | 1 & set accel to 4KHz fchoice 0
-    //if (mpu->setFchoice(mpu, FCHOICE_0)) return mpu->err;
+    //CHK_RES(mpu->setFchoice(mpu, FCHOICE_0));
 
     // set gyro to 8kHz & set accel to 4kHz
-    //if (mpu->setFchoice(mpu, FCHOICE_3)) return mpu->err;
-    //if (MPU_ERR_CHECK(mpu->setDigitalLowPassFilter(mpu, DLPF_3600HZ_NOLPF))) return mpu->err;
+    //CHK_RES(mpu->setFchoice(mpu, FCHOICE_3));
+    //CHK_RES(mpu->setDigitalLowPassFilter(mpu, DLPF_3600HZ_NOLPF));
 
     // set Digital Low Pass Filter to get smoother data
-    if (MPU_ERR_CHECK(mpu->setDigitalLowPassFilter(mpu, DLPF_42HZ))) return mpu->err;
+    CHK_RES(mpu->setDigitalLowPassFilter(mpu, DLPF_42HZ));
     // set sample rate to 1000Hz  from 4Hz - 1kHz
-    if (MPU_ERR_CHECK(mpu->setSampleRate(mpu, 250))) return mpu->err;
+    CHK_RES(mpu->setSampleRate(mpu, 250));
 
     int_config_t config = {
         .level = INT_LVL_ACTIVE_HIGH,
@@ -472,14 +470,15 @@ static esp_err_t initialize(struct mpu *mpu)
         .mode = INT_MODE_PULSE50US,
         .clear = INT_CLEAR_STATUS_REG
     };
-    if (mpu->setInterruptConfig(mpu, config)) return mpu->err;
+    CHK_RES(mpu->setInterruptConfig(mpu, config));
 
     int_en_t mask = INT_EN_RAWDATA_READY;
-    if (mpu->setInterruptEnabled(mpu, mask)) return mpu->err;
+    CHK_RES(mpu->setInterruptEnabled(mpu, mask));
 
     //MPU_LOGI("Initialization complete");
     vTaskDelay(1000 / portTICK_PERIOD_MS);
-    return mpu->err;
+error_exit:
+    return res;
 }
 
 /**
@@ -488,26 +487,26 @@ static esp_err_t initialize(struct mpu *mpu)
  *  - This function delays 100ms when using I2C and 200ms when using SPI.
  *  - It does not initialize the mpu again, just call initialize() instead.
  * */
-static esp_err_t reset(struct mpu *mpu)
+static WK_RESULT reset(struct mpu *mpu)
 {
-    if (MPU_ERR_CHECK(mpu->writeBit(mpu, PWR_MGMT1, PWR1_DEVICE_RESET_BIT, 1))) return mpu->err;
+    WK_RESULT res = WK_OK;
+
+    CHK_RES(mpu->writeBit(mpu, PWR_MGMT1, PWR1_DEVICE_RESET_BIT, 1));
     vTaskDelay(100 / portTICK_PERIOD_MS);
 #ifdef CONFIG_MPU_SPI
-    if (MPU_ERR_CHECK(mpu->resetSignalPath(mpu))) {
-        return mpu->err;
-    }
+    CHK_RES(mpu->resetSignalPath(mpu));
 #endif
-    //MPU_LOGI("Reset!");
-    return mpu->err;
+error_exit:
+    return res;
 }
 
 /**
  * @brief Enable / disable sleep mode
  * @param enable enable value
  * */
-static esp_err_t setSleep(struct mpu *mpu, bool enable)
+static WK_RESULT setSleep(struct mpu *mpu, bool enable)
 {
-    return MPU_ERR_CHECK(mpu->writeBit(mpu, PWR_MGMT1, PWR1_SLEEP_BIT, (uint8_t) enable));
+    return mpu->writeBit(mpu, PWR_MGMT1, PWR1_SLEEP_BIT, (uint8_t) enable);
 }
 
 /**
@@ -518,7 +517,7 @@ static esp_err_t setSleep(struct mpu *mpu, bool enable)
  */
 bool getSleep(struct mpu *mpu)
 {
-    MPU_ERR_CHECK(mpu->readBit(mpu, PWR_MGMT1, PWR1_SLEEP_BIT, mpu->buffer));
+    mpu->err = mpu->readBit(mpu, PWR_MGMT1, PWR1_SLEEP_BIT, mpu->buffer);
     return mpu->buffer[0];
 }
 
@@ -526,25 +525,29 @@ bool getSleep(struct mpu *mpu)
  * @brief Test connection with mpu.
  * @details It reads the WHO_AM_IM register and check its value against the correct chip model.
  * @return
- *  - `ESP_OK`: The mpu is connected and matchs the model.
- *  - `ESP_ERR_NOT_FOUND`: A device is connect, but does not match the chip selected in _menuconfig_.
+ *  - `WK_OK`: The mpu is connected and matchs the model.
+ *  - `WK_MPU_NOT_FOUND`: A device is connect, but does not match the chip selected in _menuconfig_.
  *  - May return other communication bus errors. e.g: `ESP_FAIL`, `ESP_ERR_TIMEOUT`.
  * */
-static esp_err_t testConnection(struct mpu *mpu)
+static WK_RESULT testConnection(struct mpu *mpu)
 {
+    WK_RESULT res = WK_OK;
     const uint8_t wai = mpu->whoAmI(mpu);
-    if (MPU_ERR_CHECK(mpu->lastError(mpu))) return mpu->err;
+
+    CHK_RES(mpu->lastError(mpu));
 #if defined CONFIG_MPU6000 || defined CONFIG_MPU6050 || defined CONFIG_MPU9150
-    return (wai == 0x68) ? ESP_OK : ESP_ERR_NOT_FOUND;
+    return (wai == 0x68) ? WK_OK : WK_MPU_NOT_FOUND;
 #elif defined CONFIG_MPU9255
-    return (wai == 0x73) ? ESP_OK : ESP_ERR_NOT_FOUND;
+    return (wai == 0x73) ? WK_OK : WK_MPU_NOT_FOUND;
 #elif defined CONFIG_MPU9250
-    return (wai == 0x71) ? ESP_OK : ESP_ERR_NOT_FOUND;
+    return (wai == 0x71) ? WK_OK : WK_MPU_NOT_FOUND;
 #elif defined CONFIG_MPU6555
-    return (wai == 0x7C) ? ESP_OK : ESP_ERR_NOT_FOUND;
+    return (wai == 0x7C) ? WK_OK : WK_MPU_NOT_FOUND;
 #elif defined CONFIG_MPU6500
-    return (wai == 0x70) ? ESP_OK : ESP_ERR_NOT_FOUND;
+    return (wai == 0x70) ? WK_OK : WK_MPU_NOT_FOUND;
 #endif
+error_exit:
+    return res;
 }
 
 /**
@@ -552,7 +555,7 @@ static esp_err_t testConnection(struct mpu *mpu)
  */
 uint8_t whoAmI(struct mpu *mpu)
 {
-    MPU_ERR_CHECK(mpu->readByte(mpu, WHO_AM_I, mpu->buffer));
+    mpu->err = mpu->readByte(mpu, WHO_AM_I, mpu->buffer);
     return mpu->buffer[0];
 }
 
@@ -574,8 +577,9 @@ uint8_t whoAmI(struct mpu *mpu)
  *   - If sample rate lesser than 100 Hz, data-ready interrupt will wait for compass data.
  *   - If sample rate greater than 100 Hz, data-ready interrupt will not be delayed by the compass.
  * */
-static esp_err_t setSampleRate(struct mpu *mpu, uint16_t rate)
+static WK_RESULT setSampleRate(struct mpu *mpu, uint16_t rate)
 {
+    WK_RESULT res = WK_OK;
     // Check value range
     if (rate < 4) {
         WK_DEBUGE(ERROR_TAG, "INVALID_SAMPLE_RATE %d, minimum rate is 4", rate);
@@ -588,14 +592,14 @@ static esp_err_t setSampleRate(struct mpu *mpu, uint16_t rate)
 
 #if defined CONFIG_MPU6500
     fchoice_t fchoice = mpu->getFchoice(mpu);
-    if (MPU_ERR_CHECK(mpu->lastError(mpu))) return mpu->err;
+    CHK_RES(mpu->lastError(mpu));
     if (fchoice != FCHOICE_3) {
         WK_DEBUGE(ERROR_TAG, "INVALID_STATE, sample rate divider is not effective when Fchoice != 3");
     }
 #endif
     // Check dlpf configuration
     dlpf_t dlpf = mpu->getDigitalLowPassFilter(mpu);
-    if (MPU_ERR_CHECK(mpu->lastError(mpu))) return mpu->err;
+    CHK_RES(mpu->lastError(mpu));
     if (dlpf == 0 || dlpf == 7)
         WK_DEBUGE(ERROR_TAG, "INVALID_STATE, sample rate divider is not effective when DLPF is (0 or 7)");
 
@@ -608,29 +612,31 @@ static esp_err_t setSampleRate(struct mpu *mpu, uint16_t rate)
     else {
     }
     // Write divider to register
-    if (MPU_ERR_CHECK(mpu->writeByte(mpu, SMPLRT_DIV, (uint8_t) divider))) return mpu->err;
+    CHK_RES(mpu->writeByte(mpu, SMPLRT_DIV, (uint8_t) divider));
 
-    return mpu->err;
+error_exit:
+    return res;
 }
 
 /**
  * @brief Retrieve sample rate divider and calculate the actual rate.
+ * TODO: ADD error handle
  */
 uint16_t getSampleRate(struct mpu *mpu)
 {
 #if defined CONFIG_MPU6500
     fchoice_t fchoice = mpu->getFchoice(mpu);
-    MPU_ERR_CHECK(mpu->lastError(mpu));
+    CHK_VAL(mpu->lastError(mpu));
     if (fchoice != FCHOICE_3) return SAMPLE_RATE_MAX;
 #endif
 
     const uint16_t sampleRateMax_nolpf = 8000;
-    dlpf_t dlpf                            = mpu->getDigitalLowPassFilter(mpu);
-    MPU_ERR_CHECK(mpu->lastError(mpu));
+    dlpf_t dlpf = mpu->getDigitalLowPassFilter(mpu);
+    CHK_VAL(mpu->lastError(mpu));
     if (dlpf == 0 || dlpf == 7) return sampleRateMax_nolpf;
 
     const uint16_t internalSampleRate = 1000;
-    MPU_ERR_CHECK(mpu->readByte(mpu, SMPLRT_DIV, mpu->buffer));
+    CHK_VAL(mpu->readByte(mpu, SMPLRT_DIV, mpu->buffer));
     uint16_t rate = internalSampleRate / (1 + mpu->buffer[0]);
     return rate;
 }
@@ -640,9 +646,9 @@ uint16_t getSampleRate(struct mpu *mpu)
  * @note The gyro PLL is better than internal clock.
  * @param clockSrc clock source
  */
-static esp_err_t setClockSource(struct mpu *mpu, clock_src_t clockSrc)
+static WK_RESULT setClockSource(struct mpu *mpu, clock_src_t clockSrc)
 {
-    return MPU_ERR_CHECK(mpu->writeBits(mpu, PWR_MGMT1, PWR1_CLKSEL_BIT, PWR1_CLKSEL_LENGTH, clockSrc));
+    return mpu->writeBits(mpu, PWR_MGMT1, PWR1_CLKSEL_BIT, PWR1_CLKSEL_LENGTH, clockSrc);
 }
 
 /**
@@ -650,7 +656,7 @@ static esp_err_t setClockSource(struct mpu *mpu, clock_src_t clockSrc)
  */
 clock_src_t getClockSource(struct mpu *mpu)
 {
-    MPU_ERR_CHECK(mpu->readBits(mpu, PWR_MGMT1, PWR1_CLKSEL_BIT, PWR1_CLKSEL_LENGTH, mpu->buffer));
+    mpu->err = mpu->readBits(mpu, PWR_MGMT1, PWR1_CLKSEL_BIT, PWR1_CLKSEL_LENGTH, mpu->buffer);
     return (clock_src_t) mpu->buffer[0];
 }
 
@@ -658,16 +664,16 @@ clock_src_t getClockSource(struct mpu *mpu)
  * @brief Configures Digital Low Pass Filter (DLPF) setting for both the gyroscope and accelerometer.
  * @param dlpf digital low-pass filter value
  */
-static esp_err_t setDigitalLowPassFilter(struct mpu *mpu, dlpf_t dlpf)
+static WK_RESULT setDigitalLowPassFilter(struct mpu *mpu, dlpf_t dlpf)
 {
-    if (MPU_ERR_CHECK(mpu->writeBits(mpu, CONFIG, CONFIG_DLPF_CFG_BIT, CONFIG_DLPF_CFG_LENGTH, dlpf))) {
-        return mpu->err;
-    }
+    WK_RESULT res = WK_OK;
+
+    CHK_RES(mpu->writeBits(mpu, CONFIG, CONFIG_DLPF_CFG_BIT, CONFIG_DLPF_CFG_LENGTH, dlpf));
 #if defined CONFIG_MPU6500
-    MPU_ERR_CHECK(
-        mpu->writeBits(mpu, ACCEL_CONFIG2, ACONFIG2_A_DLPF_CFG_BIT, ACONFIG2_A_DLPF_CFG_LENGTH, dlpf));
+    CHK_RES(mpu->writeBits(mpu, ACCEL_CONFIG2, ACONFIG2_A_DLPF_CFG_BIT, ACONFIG2_A_DLPF_CFG_LENGTH, dlpf));
 #endif
-    return mpu->err;
+error_exit:
+    return res;
 }
 
 /**
@@ -675,7 +681,7 @@ static esp_err_t setDigitalLowPassFilter(struct mpu *mpu, dlpf_t dlpf)
  */
 dlpf_t getDigitalLowPassFilter(struct mpu *mpu)
 {
-    MPU_ERR_CHECK(mpu->readBits(mpu, CONFIG, CONFIG_DLPF_CFG_BIT, CONFIG_DLPF_CFG_LENGTH, mpu->buffer));
+    mpu->err = mpu->readBits(mpu, CONFIG, CONFIG_DLPF_CFG_BIT, CONFIG_DLPF_CFG_LENGTH, mpu->buffer);
     return (dlpf_t) mpu->buffer[0];
 }
 
@@ -687,11 +693,14 @@ dlpf_t getDigitalLowPassFilter(struct mpu *mpu)
  *
  * @note This function delays 100 ms, needed for reset to complete.
  * */
-static esp_err_t resetSignalPath(struct mpu *mpu)
+static WK_RESULT resetSignalPath(struct mpu *mpu)
 {
-    if (MPU_ERR_CHECK(mpu->writeBit(mpu, USER_CTRL, USERCTRL_SIG_COND_RESET_BIT, 1))) return mpu->err;
+    WK_RESULT res = WK_OK;
+
+    CHK_RES(mpu->writeBit(mpu, USER_CTRL, USERCTRL_SIG_COND_RESET_BIT, 1));
     vTaskDelay(100 / portTICK_PERIOD_MS);
-    return mpu->err;
+error_exit:
+    return res;
 }
 
 /**
@@ -719,15 +728,16 @@ static esp_err_t resetSignalPath(struct mpu *mpu)
  *   - Set FCHOICE to 3 (ACCEL_FCHOICE_B bit to 0) [MPU6500 / MPU9250 only]
  *   - Enable Auxiliary I2C Master I/F
  * */
-static esp_err_t setLowPowerAccelMode(struct mpu *mpu, bool enable)
+static WK_RESULT setLowPowerAccelMode(struct mpu *mpu, bool enable)
 {
+    WK_RESULT res = WK_OK;
 // set FCHOICE
 #if defined CONFIG_MPU6500
     fchoice_t fchoice = enable ? FCHOICE_0 : FCHOICE_3;
-    if (MPU_ERR_CHECK(mpu->setFchoice(mpu, fchoice))) return mpu->err;
+    CHK_RES(mpu->setFchoice(mpu, fchoice));
 #endif
     // read PWR_MGMT1 and PWR_MGMT2 at once
-    if (MPU_ERR_CHECK(mpu->readBytes(mpu, PWR_MGMT1, 2, mpu->buffer))) return mpu->err;
+    CHK_RES(mpu->readBytes(mpu, PWR_MGMT1, 2, mpu->buffer));
     if (enable) {
         // set CYCLE bit to 1 and SLEEP bit to 0 and TEMP_DIS bit to 1
         mpu->buffer[0] |= 1 << PWR1_CYCLE_BIT;
@@ -746,10 +756,11 @@ static esp_err_t setLowPowerAccelMode(struct mpu *mpu, bool enable)
     // set STBY_XA, STBY_YA, STBY_ZA bits to 0
     mpu->buffer[1] &= ~(PWR2_STBY_XYZA_BITS);
     // write back PWR_MGMT1 and PWR_MGMT2 at once
-    if (MPU_ERR_CHECK(mpu->writeBytes(mpu, PWR_MGMT1, 2, mpu->buffer))) return mpu->err;
+    CHK_RES(mpu->writeBytes(mpu, PWR_MGMT1, 2, mpu->buffer));
     // disable Auxiliary I2C Master I/F in case it was active
-    if (MPU_ERR_CHECK(mpu->setAuxI2CEnabled(mpu, !enable))) return mpu->err;
-    return mpu->err;
+    CHK_RES(mpu->setAuxI2CEnabled(mpu, !enable));
+error_exit:
+    return res;
 }
 
 /**
@@ -769,13 +780,13 @@ bool getLowPowerAccelMode(struct mpu *mpu)
 // check FCHOICE
 #if defined CONFIG_MPU6500
     fchoice_t fchoice = mpu->getFchoice(mpu);
-    MPU_ERR_CHECK(mpu->lastError(mpu));
+    CHK_VAL(mpu->lastError(mpu));
     if (fchoice != FCHOICE_0) {
         return false;
     }
 #endif
     // read PWR_MGMT1 and PWR_MGMT2 at once
-    MPU_ERR_CHECK(mpu->readBytes(mpu, PWR_MGMT1, 2, mpu->buffer));
+    CHK_VAL(mpu->readBytes(mpu, PWR_MGMT1, 2, mpu->buffer));
     // define configuration bits
     const uint8_t LPACCEL_CONFIG_BITMASK[2] = {
         (1 << PWR1_SLEEP_BIT) | (1 << PWR1_CYCLE_BIT) | (1 << PWR1_TEMP_DIS_BIT),
@@ -792,13 +803,16 @@ bool getLowPowerAccelMode(struct mpu *mpu)
 /**
  * @brief Set Low Power Accelerometer frequency of wake-up.
  * */
-static esp_err_t setLowPowerAccelRate(struct mpu *mpu, lp_accel_rate_t rate)
+static WK_RESULT setLowPowerAccelRate(struct mpu *mpu, lp_accel_rate_t rate)
 {
+    WK_RESULT res = WK_OK;
 #if defined CONFIG_MPU6050
-    return MPU_ERR_CHECK(mpu->writeBits(mpu, PWR_MGMT2, PWR2_LP_WAKE_CTRL_BIT, PWR2_LP_WAKE_CTRL_LENGTH, rate));
+    CHK_RES(mpu->writeBits(mpu, PWR_MGMT2, PWR2_LP_WAKE_CTRL_BIT, PWR2_LP_WAKE_CTRL_LENGTH, rate));
 #elif defined CONFIG_MPU6500
-    return MPU_ERR_CHECK(mpu->writeBits(mpu, LP_ACCEL_ODR, LPA_ODR_CLKSEL_BIT, LPA_ODR_CLKSEL_LENGTH, rate));
+    CHK_RES(mpu->writeBits(mpu, LP_ACCEL_ODR, LPA_ODR_CLKSEL_BIT, LPA_ODR_CLKSEL_LENGTH, rate));
 #endif
+error_exit:
+    return res;
 }
 
 /**
@@ -807,9 +821,9 @@ static esp_err_t setLowPowerAccelRate(struct mpu *mpu, lp_accel_rate_t rate)
 lp_accel_rate_t getLowPowerAccelRate(struct mpu *mpu)
 {
 #if defined CONFIG_MPU6050
-    MPU_ERR_CHECK(mpu->readBits(mpu, PWR_MGMT2, PWR2_LP_WAKE_CTRL_BIT, PWR2_LP_WAKE_CTRL_LENGTH, mpu->buffer));
+    CHK_VAL(mpu->readBits(mpu, PWR_MGMT2, PWR2_LP_WAKE_CTRL_BIT, PWR2_LP_WAKE_CTRL_LENGTH, mpu->buffer));
 #elif defined CONFIG_MPU6500
-    MPU_ERR_CHECK(mpu->readBits(mpu, LP_ACCEL_ODR, LPA_ODR_CLKSEL_BIT, LPA_ODR_CLKSEL_LENGTH, mpu->buffer));
+    CHK_VAL(mpu->readBits(mpu, LP_ACCEL_ODR, LPA_ODR_CLKSEL_BIT, LPA_ODR_CLKSEL_LENGTH, mpu->buffer));
 #endif
     return (lp_accel_rate_t) mpu->buffer[0];
 }
@@ -828,13 +842,11 @@ lp_accel_rate_t getLowPowerAccelRate(struct mpu *mpu)
  *    and disable Auxiliary I2C Master I/F.
  *  - On _false_, this function sets DLPF to 42Hz and enables Auxiliary I2C master I/F.
  * */
-static esp_err_t setMotionFeatureEnabled(struct mpu *mpu, bool enable)
+static WK_RESULT setMotionFeatureEnabled(struct mpu *mpu, bool enable)
 {
+    WK_RESULT res = WK_OK;
 #if defined CONFIG_MPU6050
-    if (MPU_ERR_CHECK(
-            mpu->writeBits(mpu, ACCEL_CONFIG, ACONFIG_HPF_BIT, ACONFIG_HPF_LENGTH, ACCEL_DHPF_RESET))) {
-        return mpu->err;
-    }
+    CHK_RES(mpu->writeBits(mpu, ACCEL_CONFIG, ACONFIG_HPF_BIT, ACONFIG_HPF_LENGTH, ACCEL_DHPF_RESET));
 #endif
     /* enabling */
     if (enable) {
@@ -843,33 +855,27 @@ static esp_err_t setMotionFeatureEnabled(struct mpu *mpu, bool enable)
 #elif defined CONFIG_MPU6500
         const dlpf_t kDLPF = DLPF_188HZ;
 #endif
-        if (MPU_ERR_CHECK(mpu->setDigitalLowPassFilter(mpu, kDLPF))) return mpu->err;
+        CHK_RES(mpu->setDigitalLowPassFilter(mpu, kDLPF));
 #if defined CONFIG_MPU6050
         // give a time for accumulation of samples
         vTaskDelay(10 / portTICK_PERIOD_MS);
-        if (MPU_ERR_CHECK(
-                mpu->writeBits(mpu, ACCEL_CONFIG, ACONFIG_HPF_BIT, ACONFIG_HPF_LENGTH, ACCEL_DHPF_HOLD))) {
-            return mpu->err;
-        }
+        CHK_RES(mpu->writeBits(mpu, ACCEL_CONFIG, ACONFIG_HPF_BIT, ACONFIG_HPF_LENGTH, ACCEL_DHPF_HOLD));
 #elif defined CONFIG_MPU6500
-        if (MPU_ERR_CHECK(
-                mpu->writeByte(mpu, ACCEL_INTEL_CTRL, (1 << ACCEL_INTEL_EN_BIT) | (1 << ACCEL_INTEL_MODE_BIT))))
-            return mpu->err;
+        CHK_RES(mpu->writeByte(mpu, ACCEL_INTEL_CTRL, (1 << ACCEL_INTEL_EN_BIT) | (1 << ACCEL_INTEL_MODE_BIT)));
 #endif
         /* disabling */
     }
     else {
 #if defined CONFIG_MPU6500
-        if (MPU_ERR_CHECK(mpu->writeBits(mpu, ACCEL_INTEL_CTRL, ACCEL_INTEL_EN_BIT, 2, 0x0))) {
-            return mpu->err;
-        }
+        CHK_RES(mpu->writeBits(mpu, ACCEL_INTEL_CTRL, ACCEL_INTEL_EN_BIT, 2, 0x0));
 #endif
         const dlpf_t kDLPF = DLPF_42HZ;
-        if (MPU_ERR_CHECK(mpu->setDigitalLowPassFilter(mpu, kDLPF))) return mpu->err;
+        CHK_RES(mpu->setDigitalLowPassFilter(mpu, kDLPF));
     }
     // disable Auxiliary I2C Master I/F in case it was active
-    if (MPU_ERR_CHECK(mpu->setAuxI2CEnabled(mpu, !enable))) return mpu->err;
-    return mpu->err;
+    CHK_RES(mpu->setAuxI2CEnabled(mpu, !enable));
+error_exit:
+    return res;
 }
 
 /**
@@ -879,17 +885,17 @@ bool getMotionFeatureEnabled(struct mpu *mpu)
 {
     uint8_t data;
 #if defined CONFIG_MPU6050
-    MPU_ERR_CHECK(mpu->readBits(mpu, ACCEL_CONFIG, ACONFIG_HPF_BIT, ACONFIG_HPF_LENGTH, &data));
+    CHK_VAL(mpu->readBits(mpu, ACCEL_CONFIG, ACONFIG_HPF_BIT, ACONFIG_HPF_LENGTH, &data));
     if (data != ACCEL_DHPF_HOLD) return false;
     const dlpf_t kDLPF = DLPF_256HZ_NOLPF;
 #elif defined CONFIG_MPU6500
-    MPU_ERR_CHECK(mpu->readByte(mpu, ACCEL_INTEL_CTRL, &data));
+    CHK_VAL(mpu->readByte(mpu, ACCEL_INTEL_CTRL, &data));
     const uint8_t kAccelIntel = (1 << ACCEL_INTEL_EN_BIT) | (1 << ACCEL_INTEL_MODE_BIT);
     if ((data & kAccelIntel) != kAccelIntel) return false;
     const dlpf_t kDLPF = DLPF_188HZ;
 #endif
     dlpf_t dlpf = mpu->getDigitalLowPassFilter(mpu);
-    MPU_ERR_CHECK(mpu->lastError(mpu));
+    CHK_VAL(mpu->lastError(mpu));
     if (dlpf != kDLPF) return false;
     return true;
 }
@@ -923,20 +929,19 @@ bool getMotionFeatureEnabled(struct mpu *mpu)
  *  3. Configure motion-detect interrupt with setMotionDetectConfig();
  *  4. Enable the motion detection module with setMotionFeatureEnabled();
  * */
-static esp_err_t setMotionDetectConfig(struct mpu *mpu, mot_config_t* config)
+static WK_RESULT setMotionDetectConfig(struct mpu *mpu, mot_config_t* config)
 {
+    WK_RESULT res = WK_OK;
 #if defined CONFIG_MPU6050
-    if (MPU_ERR_CHECK(mpu->writeByte(mpu, MOTION_DUR, config.time))) return mpu->err;
-    if (MPU_ERR_CHECK(mpu->writeBits(mpu, MOTION_DETECT_CTRL, MOTCTRL_ACCEL_ON_DELAY_BIT,
-                                MOTCTRL_ACCEL_ON_DELAY_LENGTH, config.accel_on_delay))) {
-        return mpu->err;
-    }
-    if (MPU_ERR_CHECK(mpu->writeBits(mpu, MOTION_DETECT_CTRL, MOTCTRL_MOT_COUNT_BIT, MOTCTRL_MOT_COUNT_LENGTH,
-                                config.counter))) {
-        return mpu->err;
-    }
+    CHK_RES(mpu->writeByte(mpu, MOTION_DUR, config.time));
+    CHK_RES(mpu->writeBits(mpu, MOTION_DETECT_CTRL, MOTCTRL_ACCEL_ON_DELAY_BIT,
+                                MOTCTRL_ACCEL_ON_DELAY_LENGTH, config.accel_on_delay));
+    CHK_RES(mpu->writeBits(mpu, MOTION_DETECT_CTRL, MOTCTRL_MOT_COUNT_BIT, MOTCTRL_MOT_COUNT_LENGTH,
+                                config.counter));
 #endif
-    return MPU_ERR_CHECK(mpu->writeByte(mpu, MOTION_THR, config->threshold));
+    CHK_RES(mpu->writeByte(mpu, MOTION_THR, config->threshold));
+error_exit:
+    return res;
 }
 
 /**
@@ -946,14 +951,14 @@ mot_config_t getMotionDetectConfig(struct mpu *mpu)
 {
     mot_config_t config;
 #if defined CONFIG_MPU6050
-    MPU_ERR_CHECK(mpu->readByte(mpu, MOTION_DUR, &config.time));
-    MPU_ERR_CHECK(mpu->readByte(mpu, MOTION_DETECT_CTRL, mpu->buffer));
+    CHK_VAL(mpu->readByte(mpu, MOTION_DUR, &config.time));
+    CHK_VAL(mpu->readByte(mpu, MOTION_DETECT_CTRL, mpu->buffer));
     config.accel_on_delay =
         (mpu->buffer[0] >> (MOTCTRL_ACCEL_ON_DELAY_BIT - MOTCTRL_ACCEL_ON_DELAY_LENGTH + 1)) & 0x3;
     config.counter =
         (mot_counter_t)((mpu->buffer[0] >> (MOTCTRL_MOT_COUNT_BIT - MOTCTRL_MOT_COUNT_LENGTH + 1)) & 0x3);
 #endif
-    MPU_ERR_CHECK(mpu->readByte(mpu, MOTION_THR, &config.threshold));
+    CHK_VAL(mpu->readByte(mpu, MOTION_THR, &config.threshold));
     return config;
 }
 
@@ -975,11 +980,14 @@ mot_config_t getMotionDetectConfig(struct mpu *mpu)
  *
  * @note Enable by calling setMotionFeatureEnabled();
  * */
-static esp_err_t setZeroMotionConfig(struct mpu *mpu, zrmot_config_t* config)
+static WK_RESULT setZeroMotionConfig(struct mpu *mpu, zrmot_config_t* config)
 {
+    WK_RESULT res = WK_OK;
     mpu->buffer[0] = config.threshold;
     mpu->buffer[1] = config.time;
-    return MPU_ERR_CHECK(mpu->writeBytes(mpu, ZRMOTION_THR, 2, mpu->buffer));
+    CHK_RES(mpu->writeBytes(mpu, ZRMOTION_THR, 2, mpu->buffer));
+error_exit:
+    return res;
 }
 
 /**
@@ -987,7 +995,7 @@ static esp_err_t setZeroMotionConfig(struct mpu *mpu, zrmot_config_t* config)
  */
 zrmot_config_t getZeroMotionConfig(struct mpu *mpu)
 {
-    MPU_ERR_CHECK(mpu->readBytes(mpu, ZRMOTION_THR, 2, mpu->buffer));
+    CHK_VAL(mpu->readBytes(mpu, ZRMOTION_THR, 2, mpu->buffer));
     zrmot_config_t config{};
     config.threshold = mpu->buffer[0];
     config.time      = mpu->buffer[1];
@@ -1007,20 +1015,18 @@ zrmot_config_t getZeroMotionConfig(struct mpu *mpu)
  *
  * @note Enable by calling setMotionFeatureEnabled().
  * */
-static esp_err_t setFreeFallConfig(struct mpu *mpu, ff_config_t* config)
+static WK_RESULT setFreeFallConfig(struct mpu *mpu, ff_config_t* config)
 {
+    WK_RESULT res = WK_OK;
     mpu->buffer[0] = config.threshold;
     mpu->buffer[1] = config.time;
-    if (MPU_ERR_CHECK(mpu->writeBytes(mpu, FF_THR, 2, mpu->buffer))) return mpu->err;
-    if (MPU_ERR_CHECK(mpu->writeBits(mpu, MOTION_DETECT_CTRL, MOTCTRL_ACCEL_ON_DELAY_BIT,
-                                MOTCTRL_ACCEL_ON_DELAY_LENGTH, config.accel_on_delay))) {
-        return mpu->err;
-    }
-    if (MPU_ERR_CHECK(mpu->writeBits(mpu, MOTION_DETECT_CTRL, MOTCTRL_MOT_COUNT_BIT, MOTCTRL_MOT_COUNT_LENGTH,
-                                config.counter))) {
-        return mpu->err;
-    }
-    return mpu->err;
+    CHK_RES(mpu->writeBytes(mpu, FF_THR, 2, mpu->buffer));
+    CHK_RES(mpu->writeBits(mpu, MOTION_DETECT_CTRL, MOTCTRL_ACCEL_ON_DELAY_BIT,
+                                MOTCTRL_ACCEL_ON_DELAY_LENGTH, config.accel_on_delay));
+    CHK_RES(mpu->writeBits(mpu, MOTION_DETECT_CTRL, MOTCTRL_MOT_COUNT_BIT, MOTCTRL_MOT_COUNT_LENGTH,
+                                config.counter));
+error_exit:
+    return res;
 }
 
 /**
@@ -1029,10 +1035,10 @@ static esp_err_t setFreeFallConfig(struct mpu *mpu, ff_config_t* config)
 ff_config_t getFreeFallConfig(struct mpu *mpu)
 {
     ff_config_t config{};
-    MPU_ERR_CHECK(mpu->readBytes(mpu, FF_THR, 2, mpu->buffer));
+    CHK_VAL(mpu->readBytes(mpu, FF_THR, 2, mpu->buffer));
     config.threshold = mpu->buffer[0];
     config.time      = mpu->buffer[1];
-    MPU_ERR_CHECK(mpu->readByte(mpu, MOTION_DETECT_CTRL, mpu->buffer));
+    CHK_VAL(mpu->readByte(mpu, MOTION_DETECT_CTRL, mpu->buffer));
     config.accel_on_delay =
         (mpu->buffer[0] >> (MOTCTRL_ACCEL_ON_DELAY_BIT - MOTCTRL_ACCEL_ON_DELAY_LENGTH + 1)) & 0x3;
     config.counter =
@@ -1046,7 +1052,7 @@ ff_config_t getFreeFallConfig(struct mpu *mpu)
  * */
 mot_stat_t getMotionDetectStatus(struct mpu *mpu)
 {
-    MPU_ERR_CHECK(mpu->readByte(mpu, MOTION_DETECT_STATUS, mpu->buffer));
+    CHK_VAL(mpu->readByte(mpu, MOTION_DETECT_STATUS, mpu->buffer));
     return (mot_stat_t) mpu->buffer[0];
 }
 #endif  // MPU6050's stuff
@@ -1054,13 +1060,14 @@ mot_stat_t getMotionDetectStatus(struct mpu *mpu)
 /**
  * @brief Configure sensors' standby mode.
  * */
-static esp_err_t setStandbyMode(struct mpu *mpu, stby_en_t mask)
+static WK_RESULT setStandbyMode(struct mpu *mpu, stby_en_t mask)
 {
+    WK_RESULT res = WK_OK;
     const uint8_t kPwr1StbyBits = mask >> 6;
-    if (MPU_ERR_CHECK(mpu->writeBits(mpu, PWR_MGMT1, PWR1_GYRO_STANDBY_BIT, 2, kPwr1StbyBits))) {
-        return mpu->err;
-    }
-    return MPU_ERR_CHECK(mpu->writeBits(mpu, PWR_MGMT2, PWR2_STBY_XA_BIT, 6, mask));
+    CHK_RES(mpu->writeBits(mpu, PWR_MGMT1, PWR1_GYRO_STANDBY_BIT, 2, kPwr1StbyBits));
+    CHK_RES(mpu->writeBits(mpu, PWR_MGMT2, PWR2_STBY_XA_BIT, 6, mask));
+error_exit:
+    return res;
 }
 
 /**
@@ -1068,9 +1075,9 @@ static esp_err_t setStandbyMode(struct mpu *mpu, stby_en_t mask)
  * */
 stby_en_t getStandbyMode(struct mpu *mpu)
 {
-    MPU_ERR_CHECK(mpu->readBytes(mpu, PWR_MGMT1, 2, mpu->buffer));
+    CHK_VAL(mpu->readBytes(mpu, PWR_MGMT1, 2, mpu->buffer));
     const uint8_t kStbyTempAndGyroPLLBits = STBY_EN_TEMP | STBY_EN_LOWPWR_GYRO_PLL_ON;
-    stby_en_t mask                            = mpu->buffer[0] << 3 & kStbyTempAndGyroPLLBits;
+    stby_en_t mask = mpu->buffer[0] << 3 & kStbyTempAndGyroPLLBits;
     const uint8_t kStbyAccelAndGyroBits   = STBY_EN_ACCEL | STBY_EN_GYRO;
     mask |= mpu->buffer[1] & kStbyAccelAndGyroBits;
     return mask;
@@ -1083,14 +1090,14 @@ stby_en_t getStandbyMode(struct mpu *mpu)
  * Dev note: FCHOICE is the inverted value of FCHOICE_B (e.g. FCHOICE=2b’00 is same as FCHOICE_B=2b’11).
  * Reset value is FCHOICE_3
  * */
-static esp_err_t setFchoice(struct mpu *mpu, fchoice_t fchoice)
+static WK_RESULT setFchoice(struct mpu *mpu, fchoice_t fchoice)
 {
+    WK_RESULT res = WK_OK;
     mpu->buffer[0] = (~(fchoice) & 0x3);  // invert to fchoice_b
-    if (MPU_ERR_CHECK(
-            mpu->writeBits(mpu, GYRO_CONFIG, GCONFIG_FCHOICE_B, GCONFIG_FCHOICE_B_LENGTH, mpu->buffer[0]))) {
-        return mpu->err;
-    }
-    return MPU_ERR_CHECK(mpu->writeBit(mpu, ACCEL_CONFIG2, ACONFIG2_ACCEL_FCHOICE_B_BIT, (mpu->buffer[0] == 0) ? 0 : 1));
+    CHK_RES(mpu->writeBits(mpu, GYRO_CONFIG, GCONFIG_FCHOICE_B, GCONFIG_FCHOICE_B_LENGTH, mpu->buffer[0]));
+    CHK_RES(mpu->writeBit(mpu, ACCEL_CONFIG2, ACONFIG2_ACCEL_FCHOICE_B_BIT, (mpu->buffer[0] == 0) ? 0 : 1));
+error_exit:
+    return res;
 }
 
 /**
@@ -1098,7 +1105,7 @@ static esp_err_t setFchoice(struct mpu *mpu, fchoice_t fchoice)
  */
 fchoice_t getFchoice(struct mpu *mpu)
 {
-    MPU_ERR_CHECK(mpu->readBits(mpu, GYRO_CONFIG, GCONFIG_FCHOICE_B, GCONFIG_FCHOICE_B_LENGTH, mpu->buffer));
+    mpu->err = mpu->readBits(mpu, GYRO_CONFIG, GCONFIG_FCHOICE_B, GCONFIG_FCHOICE_B_LENGTH, mpu->buffer);
     return (fchoice_t)(~(mpu->buffer[0]) & 0x3);
 }
 #endif
@@ -1106,9 +1113,9 @@ fchoice_t getFchoice(struct mpu *mpu)
 /**
  * @brief Select Gyroscope Full-scale range.
  * */
-static esp_err_t setGyroFullScale(struct mpu *mpu, gyro_fs_t fsr)
+static WK_RESULT setGyroFullScale(struct mpu *mpu, gyro_fs_t fsr)
 {
-    return MPU_ERR_CHECK(mpu->writeBits(mpu, GYRO_CONFIG, GCONFIG_FS_SEL_BIT, GCONFIG_FS_SEL_LENGTH, fsr));
+    return mpu->writeBits(mpu, GYRO_CONFIG, GCONFIG_FS_SEL_BIT, GCONFIG_FS_SEL_LENGTH, fsr);
 }
 
 /**
@@ -1116,16 +1123,16 @@ static esp_err_t setGyroFullScale(struct mpu *mpu, gyro_fs_t fsr)
  */
 gyro_fs_t getGyroFullScale(struct mpu *mpu)
 {
-    MPU_ERR_CHECK(mpu->readBits(mpu, GYRO_CONFIG, GCONFIG_FS_SEL_BIT, GCONFIG_FS_SEL_LENGTH, mpu->buffer));
+    mpu->err = mpu->readBits(mpu, GYRO_CONFIG, GCONFIG_FS_SEL_BIT, GCONFIG_FS_SEL_LENGTH, mpu->buffer);
     return (gyro_fs_t) mpu->buffer[0];
 }
 
 /**
  * @brief Select Accelerometer Full-scale range.
  * */
-static esp_err_t setAccelFullScale(struct mpu *mpu, accel_fs_t fsr)
+static WK_RESULT setAccelFullScale(struct mpu *mpu, accel_fs_t fsr)
 {
-    return MPU_ERR_CHECK(mpu->writeBits(mpu, ACCEL_CONFIG, ACONFIG_FS_SEL_BIT, ACONFIG_FS_SEL_LENGTH, fsr));
+    return mpu->writeBits(mpu, ACCEL_CONFIG, ACONFIG_FS_SEL_BIT, ACONFIG_FS_SEL_LENGTH, fsr);
 }
 
 /**
@@ -1133,7 +1140,7 @@ static esp_err_t setAccelFullScale(struct mpu *mpu, accel_fs_t fsr)
  */
 accel_fs_t getAccelFullScale(struct mpu *mpu)
 {
-    MPU_ERR_CHECK(mpu->readBits(mpu, ACCEL_CONFIG, ACONFIG_FS_SEL_BIT, ACONFIG_FS_SEL_LENGTH, mpu->buffer));
+    mpu->err = mpu->readBits(mpu, ACCEL_CONFIG, ACONFIG_FS_SEL_BIT, ACONFIG_FS_SEL_LENGTH, mpu->buffer);
     return (accel_fs_t) mpu->buffer[0];
 }
 
@@ -1145,15 +1152,18 @@ accel_fs_t getAccelFullScale(struct mpu *mpu)
  *
  * Note: Bias inputs are LSB in +-1000dps format.
  * */
-static esp_err_t setGyroOffset(struct mpu *mpu, raw_axes_t bias)
+static WK_RESULT setGyroOffset(struct mpu *mpu, raw_axes_t bias)
 {
+    WK_RESULT res = WK_OK;
     mpu->buffer[0] = (uint8_t)(bias.data.x >> 8);
     mpu->buffer[1] = (uint8_t)(bias.data.x);
     mpu->buffer[2] = (uint8_t)(bias.data.y >> 8);
     mpu->buffer[3] = (uint8_t)(bias.data.y);
     mpu->buffer[4] = (uint8_t)(bias.data.z >> 8);
     mpu->buffer[5] = (uint8_t)(bias.data.z);
-    return MPU_ERR_CHECK(mpu->writeBytes(mpu, XG_OFFSET_H, 6, mpu->buffer));
+    CHK_RES(mpu->writeBytes(mpu, XG_OFFSET_H, 6, mpu->buffer));
+error_exit:
+    return res;
 }
 
 /**
@@ -1163,7 +1173,7 @@ static esp_err_t setGyroOffset(struct mpu *mpu, raw_axes_t bias)
  * */
 raw_axes_t getGyroOffset(struct mpu *mpu)
 {
-    MPU_ERR_CHECK(mpu->readBytes(mpu, XG_OFFSET_H, 6, mpu->buffer));
+    CHK_VAL(mpu->readBytes(mpu, XG_OFFSET_H, 6, mpu->buffer));
     raw_axes_t bias;
     bias.data.x = (mpu->buffer[0] << 8) | mpu->buffer[1];
     bias.data.y = (mpu->buffer[2] << 8) | mpu->buffer[3];
@@ -1179,19 +1189,20 @@ raw_axes_t getGyroOffset(struct mpu *mpu)
  *
  * Note: Bias inputs are LSB in +-16G format.
  * */
-static esp_err_t setAccelOffset(struct mpu *mpu, raw_axes_t bias)
+static WK_RESULT setAccelOffset(struct mpu *mpu, raw_axes_t bias)
 {
     raw_axes_t facBias;
+    WK_RESULT res = WK_OK;
     // first, read OTP values of Accel factory trim
 
 #if defined CONFIG_MPU6050
-    if (MPU_ERR_CHECK(mpu->readBytes(mpu, XA_OFFSET_H, 6, mpu->buffer))) return mpu->err;
+    CHK_RES(mpu->readBytes(mpu, XA_OFFSET_H, 6, mpu->buffer));
     facBias.x = (mpu->buffer[0] << 8) | mpu->buffer[1];
     facBias.y = (mpu->buffer[2] << 8) | mpu->buffer[3];
     facBias.z = (mpu->buffer[4] << 8) | mpu->buffer[5];
 
 #elif defined CONFIG_MPU6500
-    if (MPU_ERR_CHECK(mpu->readBytes(mpu, XA_OFFSET_H, 8, mpu->buffer))) return mpu->err;
+    CHK_RES(mpu->readBytes(mpu, XA_OFFSET_H, 8, mpu->buffer));
     // note: mpu->buffer[2] and mpu->buffer[5], stay the same,
     //  they are read just to keep the burst reading
     facBias.data.x = (mpu->buffer[0] << 8) | mpu->buffer[1];
@@ -1211,7 +1222,7 @@ static esp_err_t setAccelOffset(struct mpu *mpu, raw_axes_t bias)
     mpu->buffer[3] = (uint8_t)(facBias.y);
     mpu->buffer[4] = (uint8_t)(facBias.z >> 8);
     mpu->buffer[5] = (uint8_t)(facBias.z);
-    if (MPU_ERR_CHECK(mpu->writeBytes(mpu, XA_OFFSET_H, 6, mpu->buffer))) return mpu->err;
+    CHK_RES(mpu->writeBytes(mpu, XA_OFFSET_H, 6, mpu->buffer));
 
 #elif defined CONFIG_MPU6500
     mpu->buffer[0] = (uint8_t)(facBias.data.x >> 8);
@@ -1220,10 +1231,10 @@ static esp_err_t setAccelOffset(struct mpu *mpu, raw_axes_t bias)
     mpu->buffer[4] = (uint8_t)(facBias.data.y);
     mpu->buffer[6] = (uint8_t)(facBias.data.z >> 8);
     mpu->buffer[7] = (uint8_t)(facBias.data.z);
-    return MPU_ERR_CHECK(mpu->writeBytes(mpu, XA_OFFSET_H, 8, mpu->buffer));
+    CHK_RES(mpu->writeBytes(mpu, XA_OFFSET_H, 8, mpu->buffer));
 #endif
-
-    return mpu->err;
+error_exit:
+    return res;
 }
 
 /**
@@ -1238,13 +1249,13 @@ raw_axes_t getAccelOffset(struct mpu *mpu)
     raw_axes_t bias;
 
 #if defined CONFIG_MPU6050
-    MPU_ERR_CHECK(mpu->readBytes(mpu, XA_OFFSET_H, 6, mpu->buffer));
+    CHK_VAL(mpu->readBytes(mpu, XA_OFFSET_H, 6, mpu->buffer));
     bias.x = (mpu->buffer[0] << 8) | mpu->buffer[1];
     bias.y = (mpu->buffer[2] << 8) | mpu->buffer[3];
     bias.z = (mpu->buffer[4] << 8) | mpu->buffer[5];
 
 #elif defined CONFIG_MPU6500
-    MPU_ERR_CHECK(mpu->readBytes(mpu, XA_OFFSET_H, 8, mpu->buffer));
+    CHK_VAL(mpu->readBytes(mpu, XA_OFFSET_H, 8, mpu->buffer));
     bias.data.x                        = (mpu->buffer[0] << 8) | mpu->buffer[1];
     bias.data.y                        = (mpu->buffer[3] << 8) | mpu->buffer[4];
     bias.data.z                        = (mpu->buffer[6] << 8) | mpu->buffer[7];
@@ -1264,14 +1275,12 @@ raw_axes_t getAccelOffset(struct mpu *mpu)
  * Note: Gyro offset output are LSB in 1000DPS format.
  * Note: Accel offset output are LSB in 16G format.
  * */
-static esp_err_t computeOffsets(struct mpu *mpu, raw_axes_t* accel, raw_axes_t* gyro)
+static WK_RESULT computeOffsets(struct mpu *mpu, raw_axes_t* accel, raw_axes_t* gyro)
 {
+    WK_RESULT res = WK_OK;
     const accel_fs_t kAccelFS = ACCEL_FS_2G;     // most sensitive
     const gyro_fs_t kGyroFS   = GYRO_FS_250DPS;  // most sensitive
-    if (MPU_ERR_CHECK(mpu->getBiases(mpu, kAccelFS, kGyroFS, accel, gyro, false))) {
-        WK_DEBUGE(ERROR_TAG, "[computeOffsets] Error: Failed to get biases\n");
-        return mpu->err;
-    }
+    CHK_RES(mpu->getBiases(mpu, kAccelFS, kGyroFS, accel, gyro, false));
     // convert offsets to 16G and 1000DPS format and invert values
     for (int i = 0; i < 3; i++) {
         //acel bias / 8 (16 / 2)
@@ -1279,88 +1288,102 @@ static esp_err_t computeOffsets(struct mpu *mpu, raw_axes_t* accel, raw_axes_t* 
         //gyro bias / 4 (1000 / 250)
         (*gyro).xyz[i]  = -((*gyro).xyz[i] >> (GYRO_FS_1000DPS - kGyroFS));
     }
-    return mpu->err;
+error_exit:
+    return res;
 }
 
 /**
  * @brief Read accelerometer raw data.
  * */
-static esp_err_t acceleration(struct mpu *mpu, raw_axes_t* accel)
+static WK_RESULT acceleration(struct mpu *mpu, raw_axes_t* accel)
 {
-    if (MPU_ERR_CHECK(mpu->readBytes(mpu, ACCEL_XOUT_H, 6, mpu->buffer))) return mpu->err;
+    WK_RESULT res = WK_OK;
+    CHK_RES(mpu->readBytes(mpu, ACCEL_XOUT_H, 6, mpu->buffer));
     accel->data.x = mpu->buffer[0] << 8 | mpu->buffer[1];
     accel->data.y = mpu->buffer[2] << 8 | mpu->buffer[3];
     accel->data.z = mpu->buffer[4] << 8 | mpu->buffer[5];
-    return mpu->err;
+error_exit:
+    return res;
 }
 
 /**
  * @brief Read accelerometer raw data.
  * */
-static esp_err_t acceleration_xyz(struct mpu *mpu, int16_t* x, int16_t* y, int16_t* z)
+static WK_RESULT acceleration_xyz(struct mpu *mpu, int16_t* x, int16_t* y, int16_t* z)
 {
-    if (MPU_ERR_CHECK(mpu->readBytes(mpu, ACCEL_XOUT_H, 6, mpu->buffer))) return mpu->err;
+    WK_RESULT res = WK_OK;
+    CHK_RES(mpu->readBytes(mpu, ACCEL_XOUT_H, 6, mpu->buffer));
     *x = mpu->buffer[0] << 8 | mpu->buffer[1];
     *y = mpu->buffer[2] << 8 | mpu->buffer[3];
     *z = mpu->buffer[4] << 8 | mpu->buffer[5];
-    return mpu->err;
+error_exit:
+    return res;
 }
 
 /**
  * @brief Read gyroscope raw data.
  * */
-static esp_err_t rotation(struct mpu *mpu, raw_axes_t* gyro)
+static WK_RESULT rotation(struct mpu *mpu, raw_axes_t* gyro)
 {
-    if (MPU_ERR_CHECK(mpu->readBytes(mpu, GYRO_XOUT_H, 6, mpu->buffer))) return mpu->err;
+    WK_RESULT res = WK_OK;
+    CHK_RES(mpu->readBytes(mpu, GYRO_XOUT_H, 6, mpu->buffer));
     gyro->data.x = mpu->buffer[0] << 8 | mpu->buffer[1];
     gyro->data.y = mpu->buffer[2] << 8 | mpu->buffer[3];
     gyro->data.z = mpu->buffer[4] << 8 | mpu->buffer[5];
-    return mpu->err;
+error_exit:
+    return res;
 }
 
 /**
  * @brief Read gyroscope raw data.
  * */
-static esp_err_t rotation_xyz(struct mpu *mpu, int16_t* x, int16_t* y, int16_t* z)
+static WK_RESULT rotation_xyz(struct mpu *mpu, int16_t* x, int16_t* y, int16_t* z)
 {
-    if (MPU_ERR_CHECK(mpu->readBytes(mpu, GYRO_XOUT_H, 6, mpu->buffer))) return mpu->err;
+    WK_RESULT res = WK_OK;
+    CHK_RES(mpu->readBytes(mpu, GYRO_XOUT_H, 6, mpu->buffer));
     *x = mpu->buffer[0] << 8 | mpu->buffer[1];
     *y = mpu->buffer[2] << 8 | mpu->buffer[3];
     *z = mpu->buffer[4] << 8 | mpu->buffer[5];
-    return mpu->err;
+error_exit:
+    return res;
 }
 
 /**
  * Read temperature raw data.
  * */
-static esp_err_t temperature(struct mpu *mpu, int16_t* temp)
+static WK_RESULT temperature(struct mpu *mpu, int16_t* temp)
 {
-    if (MPU_ERR_CHECK(mpu->readBytes(mpu, TEMP_OUT_H, 2, mpu->buffer))) return mpu->err;
+    WK_RESULT res = WK_OK;
+    CHK_RES(mpu->readBytes(mpu, TEMP_OUT_H, 2, mpu->buffer));
     *temp = mpu->buffer[0] << 8 | mpu->buffer[1];
-    return mpu->err;
+error_exit:
+    return res;
 }
 
 /**
  * @brief Read accelerometer and gyroscope data at once.
  * */
-static esp_err_t motion(struct mpu *mpu, raw_axes_t* accel, raw_axes_t* gyro)
+static WK_RESULT motion(struct mpu *mpu, raw_axes_t* accel, raw_axes_t* gyro)
 {
-    if (MPU_ERR_CHECK(mpu->readBytes(mpu, ACCEL_XOUT_H, 14, mpu->buffer))) return mpu->err;
+    WK_RESULT res = WK_OK;
+    CHK_RES(mpu->readBytes(mpu, ACCEL_XOUT_H, 14, mpu->buffer));
     accel->data.x = mpu->buffer[0] << 8 | mpu->buffer[1];
     accel->data.y = mpu->buffer[2] << 8 | mpu->buffer[3];
     accel->data.z = mpu->buffer[4] << 8 | mpu->buffer[5];
     gyro->data.x  = mpu->buffer[8] << 8 | mpu->buffer[9];
     gyro->data.y  = mpu->buffer[10] << 8 | mpu->buffer[11];
     gyro->data.z  = mpu->buffer[12] << 8 | mpu->buffer[13];
-    return mpu->err;
+error_exit:
+    return res;
 }
 
 /**
  * @brief Read data from all internal sensors.
  * */
-static esp_err_t sensors(struct mpu *mpu, raw_axes_t* accel, raw_axes_t* gyro, int16_t* temp)
+static WK_RESULT sensors(struct mpu *mpu, raw_axes_t* accel, raw_axes_t* gyro, int16_t* temp)
 {
-    if (MPU_ERR_CHECK(mpu->readBytes(mpu, ACCEL_XOUT_H, 14, mpu->buffer))) return mpu->err;
+    WK_RESULT res = WK_OK;
+    CHK_RES(mpu->readBytes(mpu, ACCEL_XOUT_H, 14, mpu->buffer));
     accel->data.x = mpu->buffer[0] << 8 | mpu->buffer[1];
     accel->data.y = mpu->buffer[2] << 8 | mpu->buffer[3];
     accel->data.z = mpu->buffer[4] << 8 | mpu->buffer[5];
@@ -1368,14 +1391,16 @@ static esp_err_t sensors(struct mpu *mpu, raw_axes_t* accel, raw_axes_t* gyro, i
     gyro->data.x  = mpu->buffer[8] << 8 | mpu->buffer[9];
     gyro->data.y  = mpu->buffer[10] << 8 | mpu->buffer[11];
     gyro->data.z  = mpu->buffer[12] << 8 | mpu->buffer[13];
-    return mpu->err;
+error_exit:
+    return res;
 }
 
 /**
  * @brief Read data from all sensors, including external sensors in Aux I2C.
  * */
-static esp_err_t sensors_sen(struct mpu *mpu, sensors_t* sensors, size_t extsens_len)
+static WK_RESULT sensors_sen(struct mpu *mpu, sensors_t* sensors, size_t extsens_len)
 {
+    WK_RESULT res = WK_OK;
     const size_t kIntSensLenMax = 14;  // internal sensors data length max
     const size_t kExtSensLenMax = 24;  // external sensors data length max
     uint8_t buffer[kIntSensLenMax + kExtSensLenMax];
@@ -1385,7 +1410,7 @@ static esp_err_t sensors_sen(struct mpu *mpu, sensors_t* sensors, size_t extsens
 #else
     const size_t length           = kIntSensLenMax + extsens_len;
 #endif
-    if (MPU_ERR_CHECK(mpu->readBytes(mpu, ACCEL_XOUT_H, length, buffer))) return mpu->err;
+    CHK_RES(mpu->readBytes(mpu, ACCEL_XOUT_H, length, buffer));
     sensors->accel.data.x = buffer[0] << 8 | buffer[1];
     sensors->accel.data.y = buffer[2] << 8 | buffer[3];
     sensors->accel.data.z = buffer[4] << 8 | buffer[5];
@@ -1399,7 +1424,8 @@ static esp_err_t sensors_sen(struct mpu *mpu, sensors_t* sensors, size_t extsens
     sensors->mag.data.z = buffer[20] << 8 | buffer[19];
 #endif
     memcpy(sensors->extsens, buffer + (length - extsens_len), extsens_len);
-    return mpu->err;
+error_exit:
+    return res;
 }
 
 #if defined CONFIG_MPU9150 || (defined CONFIG_MPU6050 && !defined CONFIG_MPU6000)
@@ -1412,9 +1438,9 @@ static esp_err_t sensors_sen(struct mpu *mpu, sensors_t* sensors, size_t extsens
  * VLOGIC is the power supply voltage for the microprocessor system bus and VDD is the supply for
  * the auxiliary I2C bus
  * */
-static esp_err_t setAuxVDDIOLevel(struct mpu *mpu, auxvddio_lvl_t level)
+static WK_RESULT setAuxVDDIOLevel(struct mpu *mpu, auxvddio_lvl_t level)
 {
-    return MPU_ERR_CHECK(mpu->writeBit(mpu, YG_OTP_OFFSET_TC, TC_PWR_MODE_BIT, level));
+    return mpu->writeBit(mpu, YG_OTP_OFFSET_TC, TC_PWR_MODE_BIT, level);
 }
 
 /**
@@ -1422,7 +1448,7 @@ static esp_err_t setAuxVDDIOLevel(struct mpu *mpu, auxvddio_lvl_t level)
  */
 auxvddio_lvl_t getAuxVDDIOLevel(struct mpu *mpu)
 {
-    MPU_ERR_CHECK(mpu->readBit(mpu, YG_OTP_OFFSET_TC, TC_PWR_MODE_BIT, mpu->buffer));
+    mpu->err = mpu->readBit(mpu, YG_OTP_OFFSET_TC, TC_PWR_MODE_BIT, mpu->buffer);
     return (auxvddio_lvl_t) mpu->buffer[0];
 }
 #endif
@@ -1431,9 +1457,10 @@ auxvddio_lvl_t getAuxVDDIOLevel(struct mpu *mpu)
  * @brief Configure the Interrupt pin (INT).
  * @param config configuration desired.
  */
-static esp_err_t setInterruptConfig(struct mpu *mpu, int_config_t config)
+static WK_RESULT setInterruptConfig(struct mpu *mpu, int_config_t config)
 {
-    if (MPU_ERR_CHECK(mpu->readByte(mpu, INT_PIN_CONFIG, mpu->buffer))) return mpu->err;
+    WK_RESULT res = WK_OK;
+    CHK_RES(mpu->readByte(mpu, INT_PIN_CONFIG, mpu->buffer));
     // zero the bits we're setting, but keep the others we're not setting as they are;
     const uint8_t INT_PIN_CONFIG_BITMASK = (1 << INT_CFG_LEVEL_BIT) | (1 << INT_CFG_OPEN_BIT) |
                                                (1 << INT_CFG_LATCH_EN_BIT) |
@@ -1444,7 +1471,9 @@ static esp_err_t setInterruptConfig(struct mpu *mpu, int_config_t config)
     mpu->buffer[0] |= config.drive << INT_CFG_OPEN_BIT;
     mpu->buffer[0] |= config.mode << INT_CFG_LATCH_EN_BIT;
     mpu->buffer[0] |= config.clear << INT_CFG_ANYRD_2CLEAR_BIT;
-    return MPU_ERR_CHECK(mpu->writeByte(mpu, INT_PIN_CONFIG, mpu->buffer[0]));
+    CHK_RES(mpu->writeByte(mpu, INT_PIN_CONFIG, mpu->buffer[0]));
+error_exit:
+    return res;
 }
 
 /**
@@ -1452,7 +1481,7 @@ static esp_err_t setInterruptConfig(struct mpu *mpu, int_config_t config)
  */
 int_config_t getInterruptConfig(struct mpu *mpu)
 {
-    MPU_ERR_CHECK(mpu->readByte(mpu, INT_PIN_CONFIG, mpu->buffer));
+    CHK_VAL(mpu->readByte(mpu, INT_PIN_CONFIG, mpu->buffer));
     int_config_t config;
     config.level = (int_lvl_t)((mpu->buffer[0] >> INT_CFG_LEVEL_BIT) & 0x1);
     config.drive = (int_drive_t)((mpu->buffer[0] >> INT_CFG_OPEN_BIT) & 0x1);
@@ -1465,9 +1494,9 @@ int_config_t getInterruptConfig(struct mpu *mpu)
  * @brief Enable features to generate signal at Interrupt pin
  * @param mask ORed features.
  */
-static esp_err_t setInterruptEnabled(struct mpu *mpu, int_en_t mask)
+static WK_RESULT setInterruptEnabled(struct mpu *mpu, int_en_t mask)
 {
-    return MPU_ERR_CHECK(mpu->writeByte(mpu, INT_ENABLE, mask));
+    return mpu->writeByte(mpu, INT_ENABLE, mask);
 }
 
 /**
@@ -1475,7 +1504,7 @@ static esp_err_t setInterruptEnabled(struct mpu *mpu, int_en_t mask)
  */
 int_en_t getInterruptEnabled(struct mpu *mpu)
 {
-    MPU_ERR_CHECK(mpu->readByte(mpu, INT_ENABLE, mpu->buffer));
+    mpu->err = mpu->readByte(mpu, INT_ENABLE, mpu->buffer);
     return (int_en_t) mpu->buffer[0];
 }
 
@@ -1486,7 +1515,7 @@ int_en_t getInterruptEnabled(struct mpu *mpu)
  */
 int_stat_t getInterruptStatus(struct mpu *mpu)
 {
-    MPU_ERR_CHECK(mpu->readByte(mpu, INT_STATUS, mpu->buffer));
+    mpu->err = mpu->readByte(mpu, INT_STATUS, mpu->buffer);
     return (int_stat_t) mpu->buffer[0];
 }
 
@@ -1498,9 +1527,9 @@ int_stat_t getInterruptStatus(struct mpu *mpu)
  *  written to the fifo,replacing the oldest data.
  * `FIFO_MODE_STOP_FULL`: When the fifo is full, additional writes will not be written to fifo.
  * */
-static esp_err_t setFIFOMode(struct mpu *mpu, fifo_mode_t mode)
+static WK_RESULT setFIFOMode(struct mpu *mpu, fifo_mode_t mode)
 {
-    return MPU_ERR_CHECK(mpu->writeBit(mpu, CONFIG, CONFIG_FIFO_MODE_BIT, mode));
+    return mpu->writeBit(mpu, CONFIG, CONFIG_FIFO_MODE_BIT, mode);
 }
 
 /**
@@ -1508,17 +1537,20 @@ static esp_err_t setFIFOMode(struct mpu *mpu, fifo_mode_t mode)
  */
 fifo_mode_t getFIFOMode(struct mpu *mpu)
 {
-    MPU_ERR_CHECK(mpu->readBit(mpu, CONFIG, CONFIG_FIFO_MODE_BIT, mpu->buffer));
+    mpu->err = mpu->readBit(mpu, CONFIG, CONFIG_FIFO_MODE_BIT, mpu->buffer);
     return (fifo_mode_t) mpu->buffer[0];
 }
 
 /**
  * @brief Configure the sensors that will be written to the FIFO.
  * */
-static esp_err_t setFIFOConfig(struct mpu *mpu, fifo_config_t config)
+static WK_RESULT setFIFOConfig(struct mpu *mpu, fifo_config_t config)
 {
-    if (MPU_ERR_CHECK(mpu->writeByte(mpu, FIFO_EN, (uint8_t) config))) return mpu->err;
-    return MPU_ERR_CHECK(mpu->writeBit(mpu, I2C_MST_CTRL, I2CMST_CTRL_SLV_3_FIFO_EN_BIT, config >> 8));
+    WK_RESULT res = WK_OK;
+    CHK_RES(mpu->writeByte(mpu, FIFO_EN, (uint8_t) config));
+    CHK_RES(mpu->writeBit(mpu, I2C_MST_CTRL, I2CMST_CTRL_SLV_3_FIFO_EN_BIT, config >> 8));
+error_exit:
+    return res;
 }
 
 /**
@@ -1526,7 +1558,7 @@ static esp_err_t setFIFOConfig(struct mpu *mpu, fifo_config_t config)
  */
 fifo_config_t getFIFOConfig(struct mpu *mpu)
 {
-    MPU_ERR_CHECK(mpu->readBytes(mpu, FIFO_EN, 2, mpu->buffer));
+    CHK_VAL(mpu->readBytes(mpu, FIFO_EN, 2, mpu->buffer));
     fifo_config_t config = mpu->buffer[0];
     config |= (mpu->buffer[1] & (1 << I2CMST_CTRL_SLV_3_FIFO_EN_BIT)) << 3;
     return config;
@@ -1535,9 +1567,9 @@ fifo_config_t getFIFOConfig(struct mpu *mpu)
 /**
  * @brief Enabled / disable FIFO module.
  * */
-static esp_err_t setFIFOEnabled(struct mpu *mpu, bool enable)
+static WK_RESULT setFIFOEnabled(struct mpu *mpu, bool enable)
 {
-    return MPU_ERR_CHECK(mpu->writeBit(mpu, USER_CTRL, USERCTRL_FIFO_EN_BIT, (uint8_t) enable));
+    return mpu->writeBit(mpu, USER_CTRL, USERCTRL_FIFO_EN_BIT, (uint8_t) enable);
 }
 
 /**
@@ -1545,7 +1577,7 @@ static esp_err_t setFIFOEnabled(struct mpu *mpu, bool enable)
  */
 bool getFIFOEnabled(struct mpu *mpu)
 {
-    MPU_ERR_CHECK(mpu->readBit(mpu, USER_CTRL, USERCTRL_FIFO_EN_BIT, mpu->buffer));
+    mpu->err = mpu->readBit(mpu, USER_CTRL, USERCTRL_FIFO_EN_BIT, mpu->buffer);
     return mpu->buffer[0];
 }
 
@@ -1555,9 +1587,9 @@ bool getFIFOEnabled(struct mpu *mpu)
  * Zero FIFO count, reset is asynchronous. \n
  * The bit auto clears after one clock cycle.
  * */
-static esp_err_t resetFIFO(struct mpu *mpu)
+static WK_RESULT resetFIFO(struct mpu *mpu)
 {
-    return MPU_ERR_CHECK(mpu->writeBit(mpu, USER_CTRL, USERCTRL_FIFO_RESET_BIT, 1));
+    return mpu->writeBit(mpu, USER_CTRL, USERCTRL_FIFO_RESET_BIT, 1);
 }
 
 /**
@@ -1566,7 +1598,7 @@ static esp_err_t resetFIFO(struct mpu *mpu)
  * */
 uint16_t getFIFOCount(struct mpu *mpu)
 {
-    MPU_ERR_CHECK(mpu->readBytes(mpu, FIFO_COUNT_H, 2, mpu->buffer));
+    CHK_VAL(mpu->readBytes(mpu, FIFO_COUNT_H, 2, mpu->buffer));
     uint16_t count = mpu->buffer[0] << 8 | mpu->buffer[1];
     return count;
 }
@@ -1574,17 +1606,17 @@ uint16_t getFIFOCount(struct mpu *mpu)
 /**
  * @brief Read data contained in FIFO mpu->buffer.
  * */
-static esp_err_t readFIFO(struct mpu *mpu, size_t length, uint8_t* data)
+static WK_RESULT readFIFO(struct mpu *mpu, size_t length, uint8_t* data)
 {
-    return MPU_ERR_CHECK(mpu->readBytes(mpu, FIFO_R_W, length, data));
+    return mpu->readBytes(mpu, FIFO_R_W, length, data);
 }
 
 /**
  * @brief Write data to FIFO mpu->buffer.
  * */
-static esp_err_t writeFIFO(struct mpu *mpu, size_t length, const uint8_t* data)
+static WK_RESULT writeFIFO(struct mpu *mpu, size_t length, const uint8_t* data)
 {
-    return MPU_ERR_CHECK(mpu->writeBytes(mpu, FIFO_R_W, length, data));
+    return mpu->writeBytes(mpu, FIFO_R_W, length, data);
 }
 
 /**
@@ -1592,33 +1624,29 @@ static esp_err_t writeFIFO(struct mpu *mpu, size_t length, const uint8_t* data)
  * @note For [MPU9150, MPU9250]: The Auxiliary I2C is configured in the initialization stage
  *  to connect with the compass in Slave 0 and Slave 1.
  * */
-static esp_err_t setAuxI2CConfig(struct mpu *mpu, const auxi2c_config_t* config)
+static WK_RESULT setAuxI2CConfig(struct mpu *mpu, const auxi2c_config_t* config)
 {
+    WK_RESULT res = WK_OK;
     // TODO: check compass enabled, to constrain sample_delay which defines the compass read sample
     // rate
-    if (MPU_ERR_CHECK(mpu->readBit(mpu, I2C_MST_CTRL, I2CMST_CTRL_SLV_3_FIFO_EN_BIT, mpu->buffer))) {
-        return mpu->err;
-    }
+    CHK_RES(mpu->readBit(mpu, I2C_MST_CTRL, I2CMST_CTRL_SLV_3_FIFO_EN_BIT, mpu->buffer));
     mpu->buffer[0] <<= I2CMST_CTRL_SLV_3_FIFO_EN_BIT;
     mpu->buffer[0] |= config->multi_master_en << I2CMST_CTRL_MULT_EN_BIT;
     mpu->buffer[0] |= config->wait_for_es << I2CMST_CTRL_WAIT_FOR_ES_BIT;
     mpu->buffer[0] |= config->transition << I2CMST_CTRL_P_NSR_BIT;
     mpu->buffer[0] |= config->clock;
-    if (MPU_ERR_CHECK(mpu->writeByte(mpu, I2C_MST_CTRL, mpu->buffer[0]))) return mpu->err;
-    if (MPU_ERR_CHECK(mpu->writeBits(mpu, I2C_SLV4_CTRL, I2C_SLV4_MST_DELAY_BIT, I2C_SLV4_MST_DELAY_LENGTH,
-                                config->sample_delay))) {
-        return mpu->err;
-    }
-    if (MPU_ERR_CHECK(mpu->writeBit(mpu, I2C_MST_DELAY_CRTL, I2CMST_DLY_ES_SHADOW_BIT, config->shadow_delay_en))) {
-        return mpu->err;
-    }
+    CHK_RES(mpu->writeByte(mpu, I2C_MST_CTRL, mpu->buffer[0]));
+    CHK_RES(mpu->writeBits(mpu, I2C_SLV4_CTRL, I2C_SLV4_MST_DELAY_BIT, I2C_SLV4_MST_DELAY_LENGTH,
+                                config->sample_delay));
+    CHK_RES(mpu->writeBit(mpu, I2C_MST_DELAY_CRTL, I2CMST_DLY_ES_SHADOW_BIT, config->shadow_delay_en));
     /*
     WK_DEBUGE(ERROR_TAG, "EMPTY, Master:: multi_master_en: %d, wait_for_es: %d,"
                 "transition: %d, clock: %d, sample_delay: %d, shadow_delay_en: %d\n",
                 config->multi_master_en, config->wait_for_es, config->transition, config->clock, config->sample_delay,
                 config->shadow_delay_en);
     */
-    return mpu->err;
+error_exit:
+    return res;
 }
 
 /**
@@ -1626,16 +1654,15 @@ static esp_err_t setAuxI2CConfig(struct mpu *mpu, const auxi2c_config_t* config)
  */
 auxi2c_config_t getAuxI2CConfig(struct mpu *mpu)
 {
-    MPU_ERR_CHECK(mpu->readByte(mpu, I2C_MST_CTRL, mpu->buffer));
+    CHK_VAL(mpu->readByte(mpu, I2C_MST_CTRL, mpu->buffer));
     auxi2c_config_t config;
     config.multi_master_en = mpu->buffer[0] >> I2CMST_CTRL_MULT_EN_BIT;
     config.wait_for_es     = (mpu->buffer[0] >> I2CMST_CTRL_WAIT_FOR_ES_BIT) & 0x1;
     config.transition      = (auxi2c_trans_t)((mpu->buffer[0] >> I2CMST_CTRL_P_NSR_BIT) & 0x1);
     config.clock           = (auxi2c_clock_t)(mpu->buffer[0] & ((1 << I2CMST_CTRL_CLOCK_LENGTH) - 1));
-    MPU_ERR_CHECK(
-        mpu->readBits(mpu, I2C_SLV4_CTRL, I2C_SLV4_MST_DELAY_BIT, I2C_SLV4_MST_DELAY_LENGTH, mpu->buffer + 1));
+    CHK_VAL(mpu->readBits(mpu, I2C_SLV4_CTRL, I2C_SLV4_MST_DELAY_BIT, I2C_SLV4_MST_DELAY_LENGTH, mpu->buffer + 1));
     config.sample_delay = mpu->buffer[1];
-    MPU_ERR_CHECK(mpu->readBit(mpu, I2C_MST_DELAY_CRTL, I2CMST_DLY_ES_SHADOW_BIT, mpu->buffer + 2));
+    CHK_VAL(mpu->readBit(mpu, I2C_MST_DELAY_CRTL, I2CMST_DLY_ES_SHADOW_BIT, mpu->buffer + 2));
     config.shadow_delay_en = mpu->buffer[2];
     return config;
 }
@@ -1643,22 +1670,23 @@ auxi2c_config_t getAuxI2CConfig(struct mpu *mpu)
 /**
  * @brief Enable / disable Auxiliary I2C Master module.
  * */
-static esp_err_t setAuxI2CEnabled(struct mpu *mpu, bool enable)
+static WK_RESULT setAuxI2CEnabled(struct mpu *mpu, bool enable)
 {
-    if (MPU_ERR_CHECK(mpu->writeBit(mpu, USER_CTRL, USERCTRL_I2C_MST_EN_BIT, (uint8_t) enable))) return mpu->err;
+    WK_RESULT res = WK_OK;
+    CHK_RES(mpu->writeBit(mpu, USER_CTRL, USERCTRL_I2C_MST_EN_BIT, (uint8_t) enable));
     if (enable) {
-        return MPU_ERR_CHECK(mpu->writeBit(mpu, INT_PIN_CONFIG, INT_CFG_I2C_BYPASS_EN_BIT, 0));
+        CHK_RES(mpu->writeBit(mpu, INT_PIN_CONFIG, INT_CFG_I2C_BYPASS_EN_BIT, 0));
     }
-    return mpu->err;
+error_exit:
+    return res;
 }
 
 /**
  * @brief Enable / disable Auxiliary I2C Master module.
  * */
-static esp_err_t setAuxI2CReset(struct mpu *mpu)
+static WK_RESULT setAuxI2CReset(struct mpu *mpu)
 {
-    MPU_ERR_CHECK(mpu->writeBit(mpu, USER_CTRL, USERCTRL_I2C_MST_RESET_BIT, 1));
-    return mpu->err;
+    return mpu->writeBit(mpu, USER_CTRL, USERCTRL_I2C_MST_RESET_BIT, 1);
 }
 
 /**
@@ -1666,16 +1694,17 @@ static esp_err_t setAuxI2CReset(struct mpu *mpu)
  */
 bool getAuxI2CEnabled(struct mpu *mpu)
 {
-    MPU_ERR_CHECK(mpu->readBit(mpu, USER_CTRL, USERCTRL_I2C_MST_EN_BIT, mpu->buffer));
-    MPU_ERR_CHECK(mpu->readBit(mpu, INT_PIN_CONFIG, INT_CFG_I2C_BYPASS_EN_BIT, mpu->buffer + 1));
+    CHK_VAL(mpu->readBit(mpu, USER_CTRL, USERCTRL_I2C_MST_EN_BIT, mpu->buffer));
+    CHK_VAL(mpu->readBit(mpu, INT_PIN_CONFIG, INT_CFG_I2C_BYPASS_EN_BIT, mpu->buffer + 1));
     return mpu->buffer[0] && (!mpu->buffer[1]);
 }
 
 /**
  * @brief Configure communication with a Slave connected to Auxiliary I2C bus.
  * */
-static esp_err_t setAuxI2CSlaveConfig(struct mpu *mpu, const auxi2c_slv_config_t* config)
+static WK_RESULT setAuxI2CSlaveConfig(struct mpu *mpu, const auxi2c_slv_config_t* config)
 {
+    WK_RESULT res = WK_OK;
     // slaves' config registers are grouped as 3 regs in a row
     const uint8_t regAddr = config->slave * 3 + I2C_SLV0_ADDR;
     // data for I2C_SLVx_ADDR
@@ -1684,7 +1713,7 @@ static esp_err_t setAuxI2CSlaveConfig(struct mpu *mpu, const auxi2c_slv_config_t
     // data for I2C_SLVx_REG
     mpu->buffer[1] = config->reg_addr;
     // data for I2C_SLVx_CTRL
-    if (MPU_ERR_CHECK(mpu->readByte(mpu, regAddr + 2, mpu->buffer + 2))) return mpu->err;
+    CHK_RES(mpu->readByte(mpu, regAddr + 2, mpu->buffer + 2));
     if (config->rw == AUXI2C_READ) {
         mpu->buffer[2] &= 1 << I2C_SLV_EN_BIT;  // keep enable bit, clear the rest
         mpu->buffer[2] |= config->reg_dis << I2C_SLV_REG_DIS_BIT;
@@ -1696,19 +1725,18 @@ static esp_err_t setAuxI2CSlaveConfig(struct mpu *mpu, const auxi2c_slv_config_t
         mpu->buffer[2] &= ~(1 << I2C_SLV_REG_DIS_BIT | 0xF);  // clear length bits and register disable bit
         mpu->buffer[2] |= config->reg_dis << I2C_SLV_REG_DIS_BIT;
         mpu->buffer[2] |= 0x1;  // set length to write 1 byte
-        if (MPU_ERR_CHECK(mpu->writeByte(mpu, I2C_SLV0_DO + config->slave, config->txdata))) return mpu->err;
+        CHK_RES(mpu->writeByte(mpu, I2C_SLV0_DO + config->slave, config->txdata));
     }
-    if (MPU_ERR_CHECK(mpu->writeBytes(mpu, regAddr, 3, mpu->buffer))) return mpu->err;
+    CHK_RES(mpu->writeBytes(mpu, regAddr, 3, mpu->buffer));
     // sample_delay enable/disable
-    if (MPU_ERR_CHECK(mpu->writeBit(mpu, I2C_MST_DELAY_CRTL, config->slave, config->sample_delay_en))) {
-        return mpu->err;
-    }
+    CHK_RES(mpu->writeBit(mpu, I2C_MST_DELAY_CRTL, config->slave, config->sample_delay_en));
     /*
     WKDEBUGE(ERROR_TAG, "EMPTY, Slave%d:: r/w: %s, addr: 0x%X, reg_addr: 0x%X, reg_dis: %d, %s: 0x%X, sample_delay_en: %d\n",
         config->slave, (config->rw == AUXI2C_READ ? "read" : "write"), config->addr, config->reg_addr, config->reg_dis,
         (config->rw == AUXI2C_READ ? "rxlength" : "txdata"), config->txdata, config->sample_delay_en);
     */
-    return mpu->err;
+error_exit:
+    return res;
 }
 
 /**
@@ -1720,7 +1748,7 @@ auxi2c_slv_config_t getAuxI2CSlaveConfig(struct mpu *mpu, auxi2c_slv_t slave)
     auxi2c_slv_config_t config;
     const uint8_t regAddr = slave * 3 + I2C_SLV0_ADDR;
     config.slave          = slave;
-    MPU_ERR_CHECK(mpu->readBytes(mpu, regAddr, 3, mpu->buffer));
+    CHK_VAL(mpu->readBytes(mpu, regAddr, 3, mpu->buffer));
     config.rw       = (auxi2c_rw_t)((mpu->buffer[0] >> I2C_SLV_RNW_BIT) & 0x1);
     config.addr     = mpu->buffer[0] & 0x7F;
     config.reg_addr = mpu->buffer[1];
@@ -1731,10 +1759,10 @@ auxi2c_slv_config_t getAuxI2CSlaveConfig(struct mpu *mpu, auxi2c_slv_t slave)
         config.rxlength    = mpu->buffer[2] & 0xF;
     }
     else {
-        MPU_ERR_CHECK(mpu->readByte(mpu, I2C_SLV0_DO + slave, mpu->buffer + 3));
+        CHK_VAL(mpu->readByte(mpu, I2C_SLV0_DO + slave, mpu->buffer + 3));
         config.txdata = mpu->buffer[3];
     }
-    MPU_ERR_CHECK(mpu->readByte(mpu, I2C_MST_DELAY_CRTL, mpu->buffer + 4));
+    CHK_VAL(mpu->readByte(mpu, I2C_MST_DELAY_CRTL, mpu->buffer + 4));
     config.sample_delay_en = (mpu->buffer[4] >> slave) & 0x1;
     return config;
 }
@@ -1742,10 +1770,10 @@ auxi2c_slv_config_t getAuxI2CSlaveConfig(struct mpu *mpu, auxi2c_slv_t slave)
 /**
  * @brief Enable the Auxiliary I2C module to transfer data with a slave at sample rate.
  * */
-static esp_err_t setAuxI2CSlaveEnabled(struct mpu *mpu, auxi2c_slv_t slave, bool enable)
+static WK_RESULT setAuxI2CSlaveEnabled(struct mpu *mpu, auxi2c_slv_t slave, bool enable)
 {
     const uint8_t regAddr = slave * 3 + I2C_SLV0_CTRL;
-    return MPU_ERR_CHECK(mpu->writeBit(mpu, regAddr, I2C_SLV_EN_BIT, enable));
+    return mpu->writeBit(mpu, regAddr, I2C_SLV_EN_BIT, enable);
 }
 
 /**
@@ -1754,7 +1782,7 @@ static esp_err_t setAuxI2CSlaveEnabled(struct mpu *mpu, auxi2c_slv_t slave, bool
 bool getAuxI2CSlaveEnabled(struct mpu *mpu, auxi2c_slv_t slave)
 {
     const uint8_t regAddr = slave * 3 + I2C_SLV0_CTRL;
-    MPU_ERR_CHECK(mpu->readBit(mpu, regAddr, I2C_SLV_EN_BIT, mpu->buffer));
+    CHK_VAL(mpu->readBit(mpu, regAddr, I2C_SLV_EN_BIT, mpu->buffer));
     return mpu->buffer[0];
 }
 
@@ -1765,20 +1793,20 @@ bool getAuxI2CSlaveEnabled(struct mpu *mpu, auxi2c_slv_t slave)
  *  - `false`: Bypass is disabled, but the Auxiliar I2C Master I/F is not enabled back,
  *             if needed, enabled it again with setAuxI2CmasterEnabled().
  * */
-static esp_err_t setAuxI2CBypass(struct mpu *mpu, bool enable)
+static WK_RESULT setAuxI2CBypass(struct mpu *mpu, bool enable)
 {
+    WK_RESULT res = WK_OK;
 #ifdef CONFIG_MPU_SPI
     if (enable) {
         WK_DEBUGE(ERROR_TAG, "EMPTY, Setting Aux I2C to bypass mode while mpu is connected via SPI");
     }
 #endif
     if (enable) {
-        if (MPU_ERR_CHECK(mpu->writeBit(mpu, USER_CTRL, USERCTRL_I2C_MST_EN_BIT, 0))) return mpu->err;
+        CHK_RES(mpu->writeBit(mpu, USER_CTRL, USERCTRL_I2C_MST_EN_BIT, 0));
     }
-    if (MPU_ERR_CHECK(mpu->writeBit(mpu, INT_PIN_CONFIG, INT_CFG_I2C_BYPASS_EN_BIT, enable))) {
-        return mpu->err;
-    }
-    return mpu->err;
+    CHK_RES(mpu->writeBit(mpu, INT_PIN_CONFIG, INT_CFG_I2C_BYPASS_EN_BIT, enable));
+error_exit:
+    return res;
 }
 
 /**
@@ -1786,8 +1814,8 @@ static esp_err_t setAuxI2CBypass(struct mpu *mpu, bool enable)
  */
 bool getAuxI2CBypass(struct mpu *mpu)
 {
-    MPU_ERR_CHECK(mpu->readBit(mpu, USER_CTRL, USERCTRL_I2C_MST_EN_BIT, mpu->buffer));
-    MPU_ERR_CHECK(mpu->readBit(mpu, INT_PIN_CONFIG, INT_CFG_I2C_BYPASS_EN_BIT, mpu->buffer + 1));
+    CHK_VAL(mpu->readBit(mpu, USER_CTRL, USERCTRL_I2C_MST_EN_BIT, mpu->buffer));
+    CHK_VAL(mpu->readBit(mpu, INT_PIN_CONFIG, INT_CFG_I2C_BYPASS_EN_BIT, mpu->buffer + 1));
     return (!mpu->buffer[0]) && mpu->buffer[1];
 }
 
@@ -1809,18 +1837,21 @@ bool getAuxI2CBypass(struct mpu *mpu)
  *
  * @attention Set `skip` to `8` when using compass, because compass data takes up the first `8` bytes.
  * */
-static esp_err_t readAuxI2CRxData(struct mpu *mpu, size_t length, uint8_t* data, size_t skip)
+static WK_RESULT readAuxI2CRxData(struct mpu *mpu, size_t length, uint8_t* data, size_t skip)
 {
+    WK_RESULT res = WK_OK;
     if (length + skip > 24) {
         WK_DEBUGE(ERROR_TAG, "INVALID_LENGTH,  %d, mpu has only 24 external sensor data registers!", length);
         return mpu->err = ESP_ERR_INVALID_SIZE;
     }
 // check if I2C Master is enabled, just for warning and debug
     const bool kAuxI2CEnabled = getAuxI2CEnabled(mpu);
-    if (MPU_ERR_CHECK(mpu->lastError(mpu))) return mpu->err;
+    CHK_RES(mpu->lastError(mpu));
     if (!kAuxI2CEnabled) WK_DEBUGE(ERROR_TAG, "AUX_I2C_DISABLED, , better turn on.\n");
     // read the specified amount of registers
-    return MPU_ERR_CHECK(mpu->readBytes(mpu, EXT_SENS_DATA_00 + skip, length, data));
+    CHK_RES(mpu->readBytes(mpu, EXT_SENS_DATA_00 + skip, length, data));
+error_exit:
+    return res;
 }
 
 /**
@@ -1830,9 +1861,9 @@ static esp_err_t readAuxI2CRxData(struct mpu *mpu, size_t length, uint8_t* data,
  * is set during an active I2C master transaction, the I2C slave will hang, which
  * will require the host to reset the slave.
  * */
-static esp_err_t restartAuxI2C(struct mpu *mpu)
+static WK_RESULT restartAuxI2C(struct mpu *mpu)
 {
-    return MPU_ERR_CHECK(mpu->writeBit(mpu, USER_CTRL, USERCTRL_I2C_MST_RESET_BIT, 1));
+    return mpu->writeBit(mpu, USER_CTRL, USERCTRL_I2C_MST_RESET_BIT, 1);
 }
 
 /**
@@ -1841,7 +1872,7 @@ static esp_err_t restartAuxI2C(struct mpu *mpu)
  * */
 auxi2c_stat_t getAuxI2CStatus(struct mpu *mpu)
 {
-    MPU_ERR_CHECK(mpu->readByte(mpu, I2C_MST_STATUS, mpu->buffer));
+    mpu->err = mpu->readByte(mpu, I2C_MST_STATUS, mpu->buffer);
     return (auxi2c_stat_t) mpu->buffer[0];
 }
 
@@ -1859,11 +1890,12 @@ auxi2c_stat_t getAuxI2CStatus(struct mpu *mpu)
  *  - `ESP_FAIL`:               Auxiliary I2C Master lost arbitration of the bus;
  *  - or other standard I2C driver error codes.
  * */
-static esp_err_t auxI2CWriteByte(struct mpu *mpu, uint8_t devAddr, uint8_t regAddr, const uint8_t data)
+static WK_RESULT auxI2CWriteByte(struct mpu *mpu, uint8_t devAddr, uint8_t regAddr, const uint8_t data)
 {
+    WK_RESULT res = WK_OK;
     // check for Aux I2C master enabled first
     const bool kAuxI2CEnabled = mpu->getAuxI2CEnabled(mpu);
-    if (MPU_ERR_CHECK(mpu->lastError(mpu))) return mpu->err;
+    CHK_RES(mpu->lastError(mpu));
     if (!kAuxI2CEnabled) {
         WK_DEBUGE(ERROR_TAG, "AUX_I2C_DISABLED, , must enable first\n");
         return mpu->err = ESP_ERR_INVALID_STATE;
@@ -1876,17 +1908,17 @@ static esp_err_t auxI2CWriteByte(struct mpu *mpu, uint8_t devAddr, uint8_t regAd
     // data for I2C_SLV4_DO
     mpu->buffer[2] = data;
     // write configuration above to slave 4 registers
-    if (MPU_ERR_CHECK(mpu->writeBytes(mpu, I2C_SLV4_ADDR, 3, mpu->buffer))) return mpu->err;
+    CHK_RES(mpu->writeBytes(mpu, I2C_SLV4_ADDR, 3, mpu->buffer));
     // clear status register before enable this transfer
-    if (MPU_ERR_CHECK(mpu->readByte(mpu, I2C_MST_STATUS, mpu->buffer + 15))) return mpu->err;
+    CHK_RES(mpu->readByte(mpu, I2C_MST_STATUS, mpu->buffer + 15));
     // enable transfer in slave 4
-    if (MPU_ERR_CHECK(mpu->writeBit(mpu, I2C_SLV4_CTRL, I2C_SLV4_EN_BIT, 1))) return mpu->err;
+    CHK_RES(mpu->writeBit(mpu, I2C_SLV4_CTRL, I2C_SLV4_EN_BIT, 1));
     // check status until transfer is done
     TickType_t startTick = xTaskGetTickCount();
     TickType_t endTick   = startTick + pdMS_TO_TICKS(1000);
     auxi2c_stat_t status = 0x00;
     do {
-        if (MPU_ERR_CHECK(mpu->readByte(mpu, I2C_MST_STATUS, &status))) return mpu->err;
+        CHK_RES(mpu->readByte(mpu, I2C_MST_STATUS, &status));
         if (status & (1 << I2CMST_STAT_SLV4_NACK_BIT)) {
             WK_DEBUGE(ERROR_TAG, "AUX_I2C_SLAVE_NACK, %02x\n", (uint8_t)status);
             return mpu->err = ESP_ERR_NOT_FOUND;
@@ -1900,7 +1932,8 @@ static esp_err_t auxI2CWriteByte(struct mpu *mpu, uint8_t devAddr, uint8_t regAd
             return mpu->err = ESP_ERR_TIMEOUT;
         }
     } while (!(status & (1 << I2C_SLV4_DONE_INT_BIT)));
-    return mpu->err = ESP_OK;
+error_exit:
+    return res;
 }
 
 /**
@@ -1917,11 +1950,12 @@ static esp_err_t auxI2CWriteByte(struct mpu *mpu, uint8_t devAddr, uint8_t regAd
  *  - ESP_FAIL               Auxiliary I2C Master lost arbitration of the bus;
  *  - or other standard I2C driver error codes.
  * */
-static esp_err_t auxI2CReadByte(struct mpu *mpu, uint8_t devAddr, uint8_t regAddr, uint8_t* data)
+static WK_RESULT auxI2CReadByte(struct mpu *mpu, uint8_t devAddr, uint8_t regAddr, uint8_t* data)
 {
+    WK_RESULT res = WK_OK;
     // check for Aux I2C master enabled first
     const bool kAuxI2CEnabled = mpu->getAuxI2CEnabled(mpu);
-    if (MPU_ERR_CHECK(mpu->lastError(mpu))) return mpu->err;
+    CHK_RES(mpu->lastError(mpu));
     if (!kAuxI2CEnabled) {
         WK_DEBUGE(ERROR_TAG, "AUX_I2C_DISABLED, , must enable first\n");
         return mpu->err = ESP_ERR_INVALID_STATE;
@@ -1932,17 +1966,17 @@ static esp_err_t auxI2CReadByte(struct mpu *mpu, uint8_t devAddr, uint8_t regAdd
     // data for I2C_SLV4_REG
     mpu->buffer[1] = regAddr;
     // write configuration above to slave 4 registers
-    if (MPU_ERR_CHECK(mpu->writeBytes(mpu, I2C_SLV4_ADDR, 2, mpu->buffer))) return mpu->err;
+    CHK_RES(mpu->writeBytes(mpu, I2C_SLV4_ADDR, 2, mpu->buffer));
     // clear status register before enable this transfer
-    if (MPU_ERR_CHECK(mpu->readByte(mpu, I2C_MST_STATUS, mpu->buffer + 15))) return mpu->err;
+    CHK_RES(mpu->readByte(mpu, I2C_MST_STATUS, mpu->buffer + 15));
     // enable transfer in slave 4
-    if (MPU_ERR_CHECK(mpu->writeBit(mpu, I2C_SLV4_CTRL, I2C_SLV4_EN_BIT, 1))) return mpu->err;
+    CHK_RES(mpu->writeBit(mpu, I2C_SLV4_CTRL, I2C_SLV4_EN_BIT, 1));
     // check status until transfer is done
     TickType_t startTick = xTaskGetTickCount();
     TickType_t endTick   = startTick + pdMS_TO_TICKS(1000);
     auxi2c_stat_t status = 0x00;
     do {
-        if (MPU_ERR_CHECK(mpu->readByte(mpu, I2C_MST_STATUS, &status))) return mpu->err;
+        CHK_RES(mpu->readByte(mpu, I2C_MST_STATUS, &status));
         if (status & (1 << I2CMST_STAT_SLV4_NACK_BIT)) {
             WK_DEBUGE(ERROR_TAG, "AUX_I2C_SLAVE_NACK, %02x\n", (uint8_t)status);
             return mpu->err = ESP_ERR_NOT_FOUND;
@@ -1957,16 +1991,18 @@ static esp_err_t auxI2CReadByte(struct mpu *mpu, uint8_t devAddr, uint8_t regAdd
         }
     } while (!(status & (1 << I2C_SLV4_DONE_INT_BIT)));
     // get read value
-    return MPU_ERR_CHECK(mpu->readByte(mpu, I2C_SLV4_DI, data));
+    CHK_RES(mpu->readByte(mpu, I2C_SLV4_DI, data));
+error_exit:
+    return res;
 }
 
 /**
  * @brief Configure the active level of FSYNC pin that will cause an interrupt.
  * @details Use setFsyncEnabled() to enable / disable this interrupt.
  * */
-static esp_err_t setFsyncConfig(struct mpu *mpu, int_lvl_t level)
+static WK_RESULT setFsyncConfig(struct mpu *mpu, int_lvl_t level)
 {
-    return MPU_ERR_CHECK(mpu->writeBit(mpu, INT_PIN_CONFIG, INT_CFG_FSYNC_LEVEL_BIT, level));
+    return mpu->writeBit(mpu, INT_PIN_CONFIG, INT_CFG_FSYNC_LEVEL_BIT, level);
 }
 
 /**
@@ -1974,7 +2010,7 @@ static esp_err_t setFsyncConfig(struct mpu *mpu, int_lvl_t level)
  */
 int_lvl_t getFsyncConfig(struct mpu *mpu)
 {
-    MPU_ERR_CHECK(mpu->readBit(mpu, INT_PIN_CONFIG, INT_CFG_FSYNC_LEVEL_BIT, mpu->buffer));
+    mpu->err = mpu->readBit(mpu, INT_PIN_CONFIG, INT_CFG_FSYNC_LEVEL_BIT, mpu->buffer);
     return (int_lvl_t) mpu->buffer[0];
 }
 
@@ -1991,9 +2027,9 @@ int_lvl_t getFsyncConfig(struct mpu *mpu)
  *
  * @see setFsyncConfig().
  * */
-static esp_err_t setFsyncEnabled(struct mpu *mpu, bool enable)
+static WK_RESULT setFsyncEnabled(struct mpu *mpu, bool enable)
 {
-    return MPU_ERR_CHECK(mpu->writeBit(mpu, INT_PIN_CONFIG, INT_CFG_FSYNC_INT_MODE_EN_BIT, enable));
+    return mpu->writeBit(mpu, INT_PIN_CONFIG, INT_CFG_FSYNC_INT_MODE_EN_BIT, enable);
 }
 
 /**
@@ -2001,7 +2037,7 @@ static esp_err_t setFsyncEnabled(struct mpu *mpu, bool enable)
  */
 bool getFsyncEnabled(struct mpu *mpu)
 {
-    MPU_ERR_CHECK(mpu->readBit(mpu, INT_PIN_CONFIG, INT_CFG_FSYNC_INT_MODE_EN_BIT, mpu->buffer));
+    mpu->err = mpu->readBit(mpu, INT_PIN_CONFIG, INT_CFG_FSYNC_INT_MODE_EN_BIT, mpu->buffer);
     return mpu->buffer[0];
 }
 
@@ -2010,20 +2046,17 @@ bool getFsyncEnabled(struct mpu *mpu)
  * @param start first register number.
  * @param end last register number.
  */
-static esp_err_t registerDump(struct mpu *mpu, uint8_t start, uint8_t end)
+static WK_RESULT registerDump(struct mpu *mpu, uint8_t start, uint8_t end)
 {
     const uint8_t kNumOfRegs = 128;
-    if (end - start < 0 || start >= kNumOfRegs || end >= kNumOfRegs) return mpu->err = ESP_FAIL;
+    if (end - start < 0 || start >= kNumOfRegs || end >= kNumOfRegs) return WK_MPU_DUMP_REG_FAIL;
     WK_DEBUGE(ERROR_TAG, "LOG_COLOR_W >>  CONFIG_MPU_CHIP_MODEL  register dump: LOG_RESET_COLOR \n");
     uint8_t data;
     for (int i = start; i <= end; i++) {
-        if (MPU_ERR_CHECK(mpu->readByte(mpu, i, &data))) {
-            WK_DEBUGE(ERROR_TAG, "Reading Error.");
-            return mpu->err;
-        }
+        CHK_VAL(mpu->readByte(mpu, i, &data));
         WK_DEBUGE(ERROR_TAG, "mpu: reg[ 0x%s%X ]  data( 0x%s%X )\n", i < 0x10 ? "0" : "", i, data < 0x10 ? "0" : "", data);
     }
-    return mpu->err;
+    return WK_OK;
 }
 
 #if defined CONFIG_LIS3MDL
@@ -2035,24 +2068,26 @@ static esp_err_t registerDump(struct mpu *mpu, uint8_t start, uint8_t end)
  *  - I2C, Auxiliary I2C bus will set to bypass mode and the reading will be performed directly (faster).
  *  - SPI, the function will use Slave 4 of Auxiliary I2C bus to read the byte (slower).
  * */
-static esp_err_t compassReadByte(struct mpu *mpu, uint8_t regAddr, uint8_t* data)
+static WK_RESULT compassReadByte(struct mpu *mpu, uint8_t regAddr, uint8_t* data)
 {
+    WK_RESULT res = WK_OK;
 // in case of I2C
 #if defined CONFIG_MPU_I2C
     const bool kPrevAuxI2CBypassState = mpu->getAuxI2CBypass(mpu);
-    if (MPU_ERR_CHECK(mpu->lastError(mpu))) return mpu->err;
+    CHK_RES(mpu->lastError(mpu));
     if (kPrevAuxI2CBypassState == false) {
-        if (MPU_ERR_CHECK(mpu->setAuxI2CBypass(mpu, true))) return mpu->err;
+        CHK_RES(mpu->setAuxI2CBypass(mpu, true));
     }
-    if (MPU_ERR_CHECK(mpu->bus->readByte(mpu->bus, COMPASS_I2CADDRESS, regAddr, data))) return mpu->err;
+    CHK_RES(mpu->bus->readByte(mpu->bus, COMPASS_I2CADDRESS, regAddr, data));
     if (kPrevAuxI2CBypassState == false) {
-        if (MPU_ERR_CHECK(mpu->setAuxI2CBypass(mpu, false))) return mpu->err;
+        CHK_RES(mpu->setAuxI2CBypass(mpu, false));
     }
         // in case of SPI
 #elif defined CONFIG_MPU_SPI
-    return MPU_ERR_CHECK(mpu->auxI2CReadByte(mpu, COMPASS_I2CADDRESS, regAddr, data));
+    CHK_RES(mpu->auxI2CReadByte(mpu, COMPASS_I2CADDRESS, regAddr, data));
 #endif
-    return mpu->err;
+error_exit:
+    return res;
 }
 
 /**
@@ -2063,24 +2098,26 @@ static esp_err_t compassReadByte(struct mpu *mpu, uint8_t regAddr, uint8_t* data
  *  - I2C, Auxiliary I2C bus will set to bypass mode and the reading will be performed directly (faster).
  *  - SPI, the function will use Slave 4 of Auxiliary I2C bus to read the byte (slower).
  * */
-static esp_err_t compassWriteByte(struct mpu *mpu, uint8_t regAddr, const uint8_t data)
+static WK_RESULT compassWriteByte(struct mpu *mpu, uint8_t regAddr, const uint8_t data)
 {
+    WK_RESULT res = WK_OK;
 // in case of I2C
 #if defined CONFIG_MPU_I2C
     const bool kPrevAuxI2CBypassState = mpu->getAuxI2CBypass(mpu);
-    if (MPU_ERR_CHECK(mpu->lastError(mpu))) return mpu->err;
+    CHK_RES(mpu->lastError(mpu));
     if (kPrevAuxI2CBypassState == false) {
-        if (MPU_ERR_CHECK(mpu->setAuxI2CBypass(mpu, true))) return mpu->err;
+        CHK_RES(mpu->setAuxI2CBypass(mpu, true));
     }
-    if (MPU_ERR_CHECK(mpu->bus->writeByte(mpu->bus, COMPASS_I2CADDRESS, regAddr, data))) return mpu->err;
+    CHK_RES(mpu->bus->writeByte(mpu->bus, COMPASS_I2CADDRESS, regAddr, data));
     if (kPrevAuxI2CBypassState == false) {
-        if (MPU_ERR_CHECK(mpu->setAuxI2CBypass(mpu, false))) return mpu->err;
+        CHK_RES(mpu->setAuxI2CBypass(mpu, false));
     }
         // in case of SPI
 #elif defined CONFIG_MPU_SPI
-    return MPU_ERR_CHECK(mpu->auxI2CWriteByte(mpu, COMPASS_I2CADDRESS, regAddr, data));
+    CHK_RES(mpu->auxI2CWriteByte(mpu, COMPASS_I2CADDRESS, regAddr, data));
 #endif
-    return mpu->err;
+error_exit:
+    return res;
 }
 
 /**
@@ -2092,14 +2129,15 @@ static esp_err_t compassWriteByte(struct mpu *mpu, uint8_t regAddr, const uint8_
  *
  * To disable the compass, call compassSetMode(MAG_MODE_POWER_DOWN).
  * */
-static esp_err_t compassInit(struct mpu *mpu)
+static WK_RESULT compassInit(struct mpu *mpu)
 {
-    if (MPU_ERR_CHECK(mpu->setAuxI2CReset(mpu))) return mpu->err;
+    WK_RESULT res = WK_OK;
+    CHK_RES(mpu->setAuxI2CReset(mpu));
     // must delay, or compass may not be initialized
     vTaskDelay(50 / portTICK_PERIOD_MS);
     // I2C 接口设置旁路模式
 #ifdef CONFIG_MPU_I2C
-    if (MPU_ERR_CHECK(mpu->setAuxI2CBypass(mpu, true))) return mpu->err;
+    CHK_RES(mpu->setAuxI2CBypass(mpu, true));
     // SPI接口设置外接磁力计
 #elif CONFIG_MPU_SPI
     const auxi2c_config_t kAuxI2CConfig = {
@@ -2110,9 +2148,9 @@ static esp_err_t compassInit(struct mpu *mpu)
         .wait_for_es     = 0,
         .transition      = AUXI2C_TRANS_RESTART  //
     };
-    if (MPU_ERR_CHECK(mpu->setAuxI2CConfig(mpu, &kAuxI2CConfig))) return mpu->err;
+    CHK_RES(mpu->setAuxI2CConfig(mpu, &kAuxI2CConfig));
     //vTaskDelay(50 / portTICK_PERIOD_MS);
-    if (MPU_ERR_CHECK(mpu->setAuxI2CEnabled(mpu, true))) return mpu->err;
+    CHK_RES(mpu->setAuxI2CEnabled(mpu, true));
     //vTaskDelay(50 / portTICK_PERIOD_MS);
 #endif
 
@@ -2130,7 +2168,7 @@ static esp_err_t compassInit(struct mpu *mpu)
             .rxlength    = 6  //
         }}                    //
     };
-    if (MPU_ERR_CHECK(mpu->setAuxI2CSlaveConfig(mpu, &kSlaveReadDataConfig))) return mpu->err;
+    CHK_RES(mpu->setAuxI2CSlaveConfig(mpu, &kSlaveReadDataConfig));
 
     /*
     // slave 1 changes mode to single measurement
@@ -2143,55 +2181,45 @@ static esp_err_t compassInit(struct mpu *mpu)
         .sample_delay_en = 1,
         {.txdata = kControl1Value}  //
     };
-    if (MPU_ERR_CHECK(mpu->setAuxI2CSlaveConfig(mpu, &kSlaveChgModeConfig))) return mpu->err;
+    CHK_RES(mpu->setAuxI2CSlaveConfig(mpu, &kSlaveChgModeConfig));
     // enable slaves
-    if (MPU_ERR_CHECK(mpu->setAuxI2CSlaveEnabled(mpu, MAG_SLAVE_CHG_MODE, true))) return mpu->err;
+    CHK_RES(mpu->setAuxI2CSlaveEnabled(mpu, MAG_SLAVE_CHG_MODE, true));
     */
 
-    if (MPU_ERR_CHECK(mpu->setAuxI2CSlaveEnabled(mpu, MAG_SLAVE_READ_DATA, true))) return mpu->err;
+    CHK_RES(mpu->setAuxI2CSlaveEnabled(mpu, MAG_SLAVE_READ_DATA, true));
 
     // who am i
-    compassWhoAmI(mpu);
-    //while (1) {
-    while (mpu->buffer[0] != LIS3MDL_CHIP_ID) {
-        esp_err_t r_error = compassWhoAmI(mpu);
-        //esp_err_t w_error = compassReset(mpu);
-        WK_DEBUGE(ERROR_TAG, "LIS3MDL who am i error: %s\n", esp_err_to_name(r_error));
-        //if (r_error == w_error) {
-        //    return ESP_FAIL;
-        //}
-    }
+    CHK_RES(mpu->compassWhoAmI(mpu));
     vTaskDelay(50 / portTICK_PERIOD_MS);
 
     /* configure the magnetometer */
-    //if (MPU_ERR_CHECK(mpu->compassReset(mpu))) return mpu->err;
-    if (MPU_ERR_CHECK(mpu->setMagfullScale(mpu, lis3mdl_scale_12_Gs))) return mpu->err;
+    CHK_RES(mpu->setMagfullScale(mpu, lis3mdl_scale_12_Gs));
     //vTaskDelay(50 / portTICK_PERIOD_MS);
-    if (MPU_ERR_CHECK(mpu->compassSetSampleMode(mpu, lis3mdl_lpm_1000))) return mpu->err;
+    CHK_RES(mpu->compassSetSampleMode(mpu, lis3mdl_lpm_1000));
     //vTaskDelay(50 / portTICK_PERIOD_MS);
-    if (MPU_ERR_CHECK(mpu->compassSetMeasurementMode(mpu, lis3mdl_continuous_measurement))) return mpu->err;
-    //vTaskDelay(50 / portTICK_PERIOD_MS);
+    CHK_RES(mpu->compassSetMeasurementMode(mpu, lis3mdl_continuous_measurement));
+    vTaskDelay(50 / portTICK_PERIOD_MS);
 
     // finished configs, disable bypass mode
 #ifdef CONFIG_MPU_I2C
-    if (MPU_ERR_CHECK(mpu->setAuxI2CBypass(mpu, false))) return mpu->err;
+    CHK_RES(mpu->setAuxI2CBypass(mpu, false));
 #endif
-
-    return mpu->err;
+error_exit:
+    return res;
 }
 /**
  * @brief Soft reset LIS3MDL.
  * */
-static esp_err_t compassReset(struct mpu *mpu)
+static WK_RESULT compassReset(struct mpu *mpu)
 {
-    return (mpu->compassWriteByte(mpu, LIS3MDL_REG_CTRL2, 0x04));
+    return mpu->compassWriteByte(mpu, LIS3MDL_REG_CTRL2, 0x04);
 }
 
 /**
  * @brief Return value from WHO_I_AM register.
  * @details Should be `0x48` for AK8963 and AK8975.
  * */
-static esp_err_t compassWhoAmI(struct mpu *mpu)
+static WK_RESULT compassWhoAmI(struct mpu *mpu)
 {
     return mpu->compassReadByte(mpu, LIS3MDL_REG_WHO_AM_I, mpu->buffer);
 }
@@ -2204,8 +2232,9 @@ static esp_err_t compassWhoAmI(struct mpu *mpu)
  *  - Setting to MAG_MODE_POWER_DOWN will disable readings from compass and disable (free) Aux I2C slaves 0 and 1.
  *    It will not disable Aux I2C Master I/F though! To enable back, use compassInit().
  * */
-static esp_err_t compassSetSampleMode(struct mpu *mpu, mag_mode_t mode)
+static WK_RESULT compassSetSampleMode(struct mpu *mpu, mag_mode_t mode)
 {
+    WK_RESULT res = WK_OK;
     uint8_t ctrl_reg1 = 0x00;
     uint8_t ctrl_reg4 = 0x00;
 
@@ -2254,22 +2283,21 @@ static esp_err_t compassSetSampleMode(struct mpu *mpu, mag_mode_t mode)
     default:
         WK_DEBUGE(ERROR_TAG, "[compassSetSampleMode] should never get to here\n");
     }
-    MPU_ERR_CHECK(compassWriteByte(mpu, LIS3MDL_REG_CTRL1, ctrl_reg1));
-    MPU_ERR_CHECK(compassWriteByte(mpu, LIS3MDL_REG_CTRL4, ctrl_reg4));
-
-    return mpu->err = ESP_OK;
+    CHK_RES(compassWriteByte(mpu, LIS3MDL_REG_CTRL1, ctrl_reg1));
+    CHK_RES(compassWriteByte(mpu, LIS3MDL_REG_CTRL4, ctrl_reg4));
+error_exit:
+    return res;
 }
 
 /**
  * @brief set LIS3MDL FULL-scale range
  * @details
  * */
-static esp_err_t setMagfullScale(struct mpu *mpu, lis3mdl_scale_t scale)
+static WK_RESULT setMagfullScale(struct mpu *mpu, lis3mdl_scale_t scale)
 {
+    WK_RESULT res = WK_OK;
     uint8_t ctrl_reg2;
-    if (MPU_ERR_CHECK(compassReadByte(mpu, LIS3MDL_REG_CTRL2, &ctrl_reg2))) {
-        WK_DEBUGE(ERROR_TAG, "error: setMagfullScale compassReadByte error\n");
-    }
+    CHK_RES(compassReadByte(mpu, LIS3MDL_REG_CTRL2, &ctrl_reg2));
     switch (scale) {
     case lis3mdl_scale_4_Gs:
         ctrl_reg2 &= 0x9f;
@@ -2287,8 +2315,11 @@ static esp_err_t setMagfullScale(struct mpu *mpu, lis3mdl_scale_t scale)
         break;
     default:
         WK_DEBUGE(ERROR_TAG, "[setMagfullScale] should never get to here\n");
+        CHK_RES(WK_COMPASS_W_SCALE);
     }
-    return MPU_ERR_CHECK(mpu->compassWriteByte(mpu, LIS3MDL_REG_CTRL2, ctrl_reg2));
+    CHK_RES(mpu->compassWriteByte(mpu, LIS3MDL_REG_CTRL2, ctrl_reg2));
+error_exit:
+    return res;
 }
 
 /**
@@ -2297,9 +2328,10 @@ static esp_err_t setMagfullScale(struct mpu *mpu, lis3mdl_scale_t scale)
  *  - Setting to MAG_MODE_POWER_DOWN will disable readings from compass and disable (free) Aux I2C slaves 0 and 1.
  *    It will not disable Aux I2C Master I/F though! To enable back, use compassInit().
  * */
-static esp_err_t compassSetMeasurementMode(struct mpu *mpu, lis3mdl_measurement_mode_t mode)
+static WK_RESULT compassSetMeasurementMode(struct mpu *mpu, lis3mdl_measurement_mode_t mode)
 {
     uint8_t ctrl_reg3 = 0x00;
+    WK_RESULT res = WK_OK;
 
     //MPU_ERR_CHECK(compassReadByte(mpu, LIS3MDL_REG_CTRL3, &ctrl_reg3));
     switch (mode) {
@@ -2315,41 +2347,49 @@ static esp_err_t compassSetMeasurementMode(struct mpu *mpu, lis3mdl_measurement_
         break;
     default:
         WK_DEBUGE(ERROR_TAG, "[compassSetMeasurementMode] should never get to here\n");
+        CHK_RES(WK_COMPASS_W_MODE);
     }
-    return MPU_ERR_CHECK(mpu->compassWriteByte(mpu, LIS3MDL_REG_CTRL3, ctrl_reg3));
+    CHK_RES(mpu->compassWriteByte(mpu, LIS3MDL_REG_CTRL3, ctrl_reg3));
+error_exit:
+    return res;
 }
 
 /**
  * @brief Read compass data.
  * */
-static esp_err_t heading(struct mpu *mpu, raw_axes_t* mag)
+static WK_RESULT heading(struct mpu *mpu, raw_axes_t* mag)
 {
-    if (MPU_ERR_CHECK(mpu->readBytes(mpu, EXT_SENS_DATA_00, 6, mpu->buffer))) return mpu->err;
+    WK_RESULT res = WK_OK;
+    CHK_RES(mpu->readBytes(mpu, EXT_SENS_DATA_00, 6, mpu->buffer));
     mag->data.x = mpu->buffer[1] << 8 | mpu->buffer[0];
     mag->data.y = mpu->buffer[3] << 8 | mpu->buffer[2];
     mag->data.z = mpu->buffer[5] << 8 | mpu->buffer[4];
-    return mpu->err;
+error_exit:
+    return res;
 }
 
 /**
  * @brief Read compass data.
  * */
-static esp_err_t heading_xyz(struct mpu *mpu, int16_t* x, int16_t* y, int16_t* z)
+static WK_RESULT heading_xyz(struct mpu *mpu, int16_t* x, int16_t* y, int16_t* z)
 {
-    if (MPU_ERR_CHECK(mpu->readBytes(mpu, EXT_SENS_DATA_01, 6, mpu->buffer))) return mpu->err;
+    WK_RESULT res = WK_OK;
+    CHK_RES(mpu->readBytes(mpu, EXT_SENS_DATA_01, 6, mpu->buffer));
     *x = mpu->buffer[1] << 8 | mpu->buffer[0];
     *y = mpu->buffer[3] << 8 | mpu->buffer[2];
     *z = mpu->buffer[5] << 8 | mpu->buffer[4];
-    return mpu->err;
+error_exit:
+    return res;
 }
 
 /**
  * @brief Read accelerometer, gyroscope, compass raw data.
  * */
-static esp_err_t motion_mag(struct mpu *mpu, raw_axes_t* accel, raw_axes_t* gyro, raw_axes_t* mag)
+static WK_RESULT motion_mag(struct mpu *mpu, raw_axes_t* accel, raw_axes_t* gyro, raw_axes_t* mag)
 {
+    WK_RESULT res = WK_OK;
     uint8_t buffer[22];
-    if (MPU_ERR_CHECK(mpu->readBytes(mpu, ACCEL_XOUT_H, 22, buffer))) return mpu->err;
+    CHK_RES(mpu->readBytes(mpu, ACCEL_XOUT_H, 22, buffer));
     accel->data.x = buffer[0] << 8 | buffer[1];
     accel->data.y = buffer[2] << 8 | buffer[3];
     accel->data.z = buffer[4] << 8 | buffer[5];
@@ -2359,7 +2399,8 @@ static esp_err_t motion_mag(struct mpu *mpu, raw_axes_t* accel, raw_axes_t* gyro
     mag->data.x   = buffer[16] << 8 | buffer[15];
     mag->data.y   = buffer[18] << 8 | buffer[17];
     mag->data.z   = buffer[20] << 8 | buffer[19];
-    return mpu->err;
+error_exit:
+    return res;
 }
 #endif // CONFIG_LIS3MDL
 
@@ -2369,8 +2410,9 @@ static esp_err_t motion_mag(struct mpu *mpu, raw_axes_t* accel, raw_axes_t* gyro
  * @param result Should be ZERO if gyro and accel passed.
  * @todo Elaborate doc.
  * */
-static esp_err_t selfTest(struct mpu *mpu, selftest_t* result)
+static WK_RESULT selfTest(struct mpu *mpu, selftest_t* result)
 {
+    WK_RESULT res = WK_OK;
 #ifdef CONFIG_MPU6050
     const accel_fs_t kAccelFS = ACCEL_FS_16G;
     const gyro_fs_t kGyroFS   = GYRO_FS_250DPS;
@@ -2381,18 +2423,19 @@ static esp_err_t selfTest(struct mpu *mpu, selftest_t* result)
     raw_axes_t gyroRegBias, accelRegBias;
     raw_axes_t gyroSTBias, accelSTBias;
     // get regular biases
-    if (MPU_ERR_CHECK(mpu->getBiases(mpu, kAccelFS, kGyroFS, &accelRegBias, &gyroRegBias, false))) return mpu->err;
+    CHK_RES(mpu->getBiases(mpu, kAccelFS, kGyroFS, &accelRegBias, &gyroRegBias, false));
     // get self-test biases
-    if (MPU_ERR_CHECK(mpu->getBiases(mpu, kAccelFS, kGyroFS, &accelSTBias, &gyroSTBias, true))) return mpu->err;
+    CHK_RES(mpu->getBiases(mpu, kAccelFS, kGyroFS, &accelSTBias, &gyroSTBias, true));
     // perform self-tests
     uint8_t accelST, gyroST;
-    if (MPU_ERR_CHECK(mpu->accelSelfTest(mpu, &accelRegBias, &accelSTBias, &accelST))) return mpu->err;
-    if (MPU_ERR_CHECK(mpu->gyroSelfTest(mpu, &gyroRegBias, &gyroSTBias, &gyroST))) return mpu->err;
+    CHK_RES(mpu->accelSelfTest(mpu, &accelRegBias, &accelSTBias, &accelST));
+    CHK_RES(mpu->gyroSelfTest(mpu, &gyroRegBias, &gyroSTBias, &gyroST));
     // check results
     *result = 0;
     if (accelST != 0) *result |= SELF_TEST_ACCEL_FAIL;
     if (gyroST != 0) *result |= SELF_TEST_GYRO_FAIL;
-    return mpu->err;
+error_exit:
+    return res;
 }
 
 /**
@@ -2401,16 +2444,18 @@ static esp_err_t selfTest(struct mpu *mpu, selftest_t* result)
  * @param result Should be ZERO if gyro and accel passed.
  * @todo Elaborate doc.
  * */
-static esp_err_t setGyroBias(struct mpu *mpu)
+static WK_RESULT setGyroBias(struct mpu *mpu)
 {
+    WK_RESULT res = WK_OK;
     const accel_fs_t kAccelFS = accel_fs;
     const gyro_fs_t kGyroFS   = gyro_fs;
     raw_axes_t gyroRegBias, accelRegBias;
     // get regular biases
-    if (MPU_ERR_CHECK(mpu->getBiases(mpu, kAccelFS, kGyroFS, &accelRegBias, &gyroRegBias, false))) return mpu->err;
+    CHK_RES(mpu->getBiases(mpu, kAccelFS, kGyroFS, &accelRegBias, &gyroRegBias, false));
     gyroRegBias.x = -gyroRegBias.x; gyroRegBias.y = -gyroRegBias.y; gyroRegBias.z = -gyroRegBias.z;
-    if (MPU_ERR_CHECK(mpu->setGyroOffset(mpu, gyroRegBias))) return mpu->err;
-    return mpu->err;
+    CHK_RES(mpu->setGyroOffset(mpu, gyroRegBias));
+error_exit:
+    return res;
 }
 
 #if defined CONFIG_MPU6500
@@ -2457,8 +2502,9 @@ static const uint16_t kSelfTestTable[256] = {
  * @param result self-test error for each axis (X=bit0, Y=bit1, Z=bit2). Zero is a pass.
  * @note Bias should be in 16G format for MPU6050 and 2G for MPU6500 based models.
  * */
-static esp_err_t accelSelfTest(struct mpu *mpu, raw_axes_t* regularBias, raw_axes_t* selfTestBias, uint8_t* result)
+static WK_RESULT accelSelfTest(struct mpu *mpu, raw_axes_t* regularBias, raw_axes_t* selfTestBias, uint8_t* result)
 {
+    WK_RESULT res = WK_OK;
 #if defined CONFIG_MPU6050
     const accel_fs_t kAccelFS = ACCEL_FS_16G;
     // Criteria A: must be within 14% variation
@@ -2493,7 +2539,7 @@ static esp_err_t accelSelfTest(struct mpu *mpu, raw_axes_t* regularBias, raw_axe
     shiftCode[2] = ((mpu->buffer[2] & 0xE0) >> 3) | (mpu->buffer[3] & 0x03);
 
 #elif defined CONFIG_MPU6500
-    if (MPU_ERR_CHECK(mpu->readBytes(mpu, SELF_TEST_X_ACCEL, 3, shiftCode))) return mpu->err;
+    CHK_RES(mpu->readBytes(mpu, SELF_TEST_X_ACCEL, 3, shiftCode));
 #endif
     WK_DEBUGD(ST_TAG, "EMPTY, shiftCode: %+d %+d %+d\n", shiftCode[0], shiftCode[1], shiftCode[2]);
 
@@ -2544,7 +2590,8 @@ static esp_err_t accelSelfTest(struct mpu *mpu, raw_axes_t* regularBias, raw_axe
 
     WK_DEBUGD(ST_TAG, "Accel self-test: [X=%s] [Y=%s] [Z=%s]\n", ((*result & 0x1) ? "FAIL" : "OK"),
              ((*result & 0x2) ? "FAIL" : "OK"), ((*result & 0x4) ? "FAIL" : "OK"));
-    return mpu->err;
+error_exit:
+    return res;
 }
 
 /**
@@ -2552,8 +2599,9 @@ static esp_err_t accelSelfTest(struct mpu *mpu, raw_axes_t* regularBias, raw_axe
  * @param result Self-test error for each axis (X=bit0, Y=bit1, Z=bit2). Zero is a pass.
  * @note Bias should be in 250DPS format for both MPU6050 and MPU6500 based models.
  * */
-static esp_err_t gyroSelfTest(struct mpu *mpu, raw_axes_t* regularBias, raw_axes_t* selfTestBias, uint8_t* result)
+static WK_RESULT gyroSelfTest(struct mpu *mpu, raw_axes_t* regularBias, raw_axes_t* selfTestBias, uint8_t* result)
 {
+    WK_RESULT res = WK_OK;
     const gyro_fs_t kGyroFS = GYRO_FS_250DPS;
 
 #if defined CONFIG_MPU6050
@@ -2586,7 +2634,7 @@ static esp_err_t gyroSelfTest(struct mpu *mpu, raw_axes_t* regularBias, raw_axes
     shiftCode[2] = mpu->buffer[2] & 0x1F;
 
 #elif defined CONFIG_MPU6500
-    if (MPU_ERR_CHECK(mpu->readBytes(mpu, SELF_TEST_X_GYRO, 3, shiftCode))) return mpu->err;
+    CHK_RES(mpu->readBytes(mpu, SELF_TEST_X_GYRO, 3, shiftCode));
 #endif
     WK_DEBUGD(ST_TAG, "EMPTY, shiftCode: %+d %+d %+d\n", shiftCode[0], shiftCode[1], shiftCode[2]);
 
@@ -2629,7 +2677,8 @@ static esp_err_t gyroSelfTest(struct mpu *mpu, raw_axes_t* regularBias, raw_axes
 
     WK_DEBUGD(ST_TAG, "Gyro self-test: [X=%s] [Y=%s] [Z=%s]\n", ((*result & 0x1) ? "FAIL" : "OK"),
              ((*result & 0x2) ? "FAIL" : "OK"), ((*result & 0x4) ? "FAIL" : "OK"));
-    return mpu->err;
+error_exit:
+    return res;
 }
 
 /**
@@ -2637,9 +2686,10 @@ static esp_err_t gyroSelfTest(struct mpu *mpu, raw_axes_t* regularBias, raw_axes
  * @attention When calculating the biases the mpu must remain as horizontal as possible (0 degrees), facing up.
  * This algorithm takes about ~400ms to compute offsets.
  * */
-static esp_err_t getBiases(struct mpu *mpu, accel_fs_t accelFS, gyro_fs_t gyroFS, raw_axes_t* accelBias, raw_axes_t* gyroBias,
+static WK_RESULT getBiases(struct mpu *mpu, accel_fs_t accelFS, gyro_fs_t gyroFS, raw_axes_t* accelBias, raw_axes_t* gyroBias,
                          bool selftest)
 {
+    WK_RESULT res = WK_OK;
     // configurations to compute biases
     const uint16_t kSampleRate      = 1000;
     const dlpf_t kDLPF              = DLPF_188HZ;
@@ -2657,26 +2707,22 @@ static esp_err_t getBiases(struct mpu *mpu, accel_fs_t accelFS, gyro_fs_t gyroFS
     const bool prevFIFOState           = mpu->getFIFOEnabled(mpu);
 
     // setup
-    if (MPU_ERR_CHECK(mpu->setSampleRate(mpu, kSampleRate))) return mpu->err;
-    if (MPU_ERR_CHECK(mpu->setDigitalLowPassFilter(mpu, kDLPF))) return mpu->err;
-    if (MPU_ERR_CHECK(mpu->setAccelFullScale(mpu, accelFS))) return mpu->err;
-    if (MPU_ERR_CHECK(mpu->setGyroFullScale(mpu, gyroFS))) return mpu->err;
-    if (MPU_ERR_CHECK(mpu->setFIFOConfig(mpu, kFIFOConfig))) return mpu->err;
-    if (MPU_ERR_CHECK(mpu->setFIFOEnabled(mpu, true))) return mpu->err;
+    CHK_RES(mpu->setSampleRate(mpu, kSampleRate));
+    CHK_RES(mpu->setDigitalLowPassFilter(mpu, kDLPF));
+    CHK_RES(mpu->setAccelFullScale(mpu, accelFS));
+    CHK_RES(mpu->setGyroFullScale(mpu, gyroFS));
+    CHK_RES(mpu->setFIFOConfig(mpu, kFIFOConfig));
+    CHK_RES(mpu->setFIFOEnabled(mpu, true));
     if (selftest) {
-        if (MPU_ERR_CHECK(mpu->writeBits(mpu, ACCEL_CONFIG, ACONFIG_XA_ST_BIT, 3, 0x7))) {
-            return mpu->err;
-        }
-        if (MPU_ERR_CHECK(mpu->writeBits(mpu, GYRO_CONFIG, GCONFIG_XG_ST_BIT, 3, 0x7))) {
-            return mpu->err;
-        }
+        CHK_RES(mpu->writeBits(mpu, ACCEL_CONFIG, ACONFIG_XA_ST_BIT, 3, 0x7));
+        CHK_RES(mpu->writeBits(mpu, GYRO_CONFIG, GCONFIG_XG_ST_BIT, 3, 0x7));
     }
     // wait for 200ms for sensors to stabilize
     vTaskDelay(200 / portTICK_PERIOD_MS);
     /*
     //fifo doesn't work well
     // fill FIFO for 100ms
-    if (MPU_ERR_CHECK(mpu->resetFIFO(mpu))) return mpu->err;
+    CHK_RES(mpu->resetFIFO(mpu));
     vTaskDelay(100 / portTICK_PERIOD_MS);
     //if (MPU_ERR_CHECK(mpu->setFIFOConfig(mpu, FIFO_CFG_NONE))) return mpu->err;
     // get FIFO count
@@ -2687,21 +2733,18 @@ static esp_err_t getBiases(struct mpu *mpu, accel_fs_t accelFS, gyro_fs_t gyroFS
         vTaskDelay(100 / portTICK_PERIOD_MS);
         fifoCount = mpu->getFIFOCount(mpu);
     }
-    if (MPU_ERR_CHECK(mpu->lastError(mpu))) return mpu->err;
+    CHK_RES(mpu->lastError(mpu));
     const int packetCount = fifoCount / kPacketSize;
     // read overrun bytes, if any
     const int overrunCount = fifoCount - (packetCount * kPacketSize);
     uint8_t buffer[kPacketSize];
     memset(buffer, 0, kPacketSize);
     if (overrunCount > 0) {
-        if (MPU_ERR_CHECK(mpu->readFIFO(mpu, overrunCount, buffer))) return mpu->err;
+        CHK_RES(mpu->readFIFO(mpu, overrunCount, buffer));
     }
     // fetch data and add up
     for (int i = 0; i < packetCount; i++) {
-        if (MPU_ERR_CHECK(mpu->readFIFO(mpu, kPacketSize, buffer))) {
-            WK_DEBUGE(ERROR_TAG, "getBiases read FIFO done size: %d\n", kPacketSize);
-            return mpu->err;
-        }
+        CHK_RES(mpu->readFIFO(mpu, kPacketSize, buffer));
         // retrieve data
         raw_axes_t accelCur, gyroCur;
         accelCur.data.x = (buffer[0] << 8) | buffer[1];
@@ -2770,24 +2813,20 @@ static esp_err_t getBiases(struct mpu *mpu, accel_fs_t accelFS, gyro_fs_t gyroFS
         (*gyroBias).xyz[i]  = (int16_t) gyroAvg.xyz[i];
     }
     // set back previous configs
-    if (MPU_ERR_CHECK(mpu->setSampleRate(mpu, prevSampleRate))) return mpu->err;
-    if (MPU_ERR_CHECK(mpu->setDigitalLowPassFilter(mpu, prevDLPF))) return mpu->err;
-    if (MPU_ERR_CHECK(mpu->setAccelFullScale(mpu, prevAccelFS))) return mpu->err;
-    if (MPU_ERR_CHECK(mpu->setGyroFullScale(mpu, prevGyroFS))) return mpu->err;
-    if (MPU_ERR_CHECK(mpu->setFIFOConfig(mpu, prevFIFOConfig))) return mpu->err;
-    if (MPU_ERR_CHECK(mpu->setFIFOEnabled(mpu, prevFIFOState))) return mpu->err;
+    CHK_RES(mpu->setSampleRate(mpu, prevSampleRate));
+    CHK_RES(mpu->setDigitalLowPassFilter(mpu, prevDLPF));
+    CHK_RES(mpu->setAccelFullScale(mpu, prevAccelFS));
+    CHK_RES(mpu->setGyroFullScale(mpu, prevGyroFS));
+    CHK_RES(mpu->setFIFOConfig(mpu, prevFIFOConfig));
+    CHK_RES(mpu->setFIFOEnabled(mpu, prevFIFOState));
 
     // reset self test mode
     if (selftest) {
-        if (MPU_ERR_CHECK(mpu->writeBits(mpu, ACCEL_CONFIG, ACONFIG_XA_ST_BIT, 3, 0x0))) {
-            return mpu->err;
-        }
-        if (MPU_ERR_CHECK(mpu->writeBits(mpu, GYRO_CONFIG, GCONFIG_XG_ST_BIT, 3, 0x0))) {
-            return mpu->err;
-        }
+        CHK_RES(mpu->writeBits(mpu, ACCEL_CONFIG, ACONFIG_XA_ST_BIT, 3, 0x0));
+        CHK_RES(mpu->writeBits(mpu, GYRO_CONFIG, GCONFIG_XG_ST_BIT, 3, 0x0));
     }
-
-    return mpu->err;
+error_exit:
+    return res;
 }
 
 /**
@@ -2801,31 +2840,32 @@ static esp_err_t getBiases(struct mpu *mpu, accel_fs_t accelFS, gyro_fs_t gyroFS
  * Note: Gyro offset output are LSB in 1000DPS format.
  * Note: Accel offset output are LSB in 16G format.
  * */
-static esp_err_t setOffsets(struct mpu *mpu)
+static WK_RESULT setOffsets(struct mpu *mpu)
 {
+    WK_RESULT res = WK_OK;
     raw_axes_t accel;   // x, y, z axes as int16
     raw_axes_t gyro;    // x, y, z axes as int16
 
     const accel_fs_t prevAccelFS       = mpu->getAccelFullScale(mpu);
     const gyro_fs_t prevGyroFS         = mpu->getGyroFullScale(mpu);
 
-    if (MPU_ERR_CHECK(mpu->setAccelFullScale(mpu, ACCEL_FS_16G))) return mpu->err;
-    if (MPU_ERR_CHECK(mpu->setGyroFullScale(mpu, GYRO_FS_1000DPS))) return mpu->err;
+    CHK_RES(mpu->setAccelFullScale(mpu, ACCEL_FS_16G));
+    CHK_RES(mpu->setGyroFullScale(mpu, GYRO_FS_1000DPS));
 
-    if (MPU_ERR_CHECK(mpu->computeOffsets(mpu, &accel, &gyro))) return mpu->err;
+    CHK_RES(mpu->computeOffsets(mpu, &accel, &gyro));
 
     //WK_DEBUGE(ERROR_TAG, "set Bias gyro: %x, %x, %x\n", gyro.data.x, gyro.data.y, gyro.data.z);
     //WK_DEBUGE(ERROR_TAG, "set Bias accel: %x, %x, %x\n", accel.data.x, accel.data.y, accel.data.z);
-    if (MPU_ERR_CHECK(mpu->setGyroOffset(mpu, gyro))) return mpu->err;
-    if (MPU_ERR_CHECK(mpu->setAccelOffset(mpu, accel))) return mpu->err;
+    CHK_RES(mpu->setGyroOffset(mpu, gyro));
+    CHK_RES(mpu->setAccelOffset(mpu, accel));
 
-    if (MPU_ERR_CHECK(mpu->setAccelFullScale(mpu, prevAccelFS))) return mpu->err;
-    if (MPU_ERR_CHECK(mpu->setGyroFullScale(mpu, prevGyroFS))) return mpu->err;
+    CHK_RES(mpu->setAccelFullScale(mpu, prevAccelFS));
+    CHK_RES(mpu->setGyroFullScale(mpu, prevGyroFS));
 
     //gyro = mpu->getGyroOffset(mpu);
     //accel = mpu->getAccelOffset(mpu);
     //WK_DEBUGE(ERROR_TAG, "get Bias gyro: %x, %x, %x\n", gyro.data.x, gyro.data.y, gyro.data.z);
     //WK_DEBUGE(ERROR_TAG, "get Bias accel: %x, %x, %x\n", accel.data.x, accel.data.y, accel.data.z);
-
-    return mpu->err;
+error_exit:
+    return res;
 }
