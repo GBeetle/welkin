@@ -93,7 +93,7 @@ void init_spi(struct spi *spi, spi_host_device_t host){
 }
 
 static WK_RESULT begin(struct spi *spi, int mosi_io_num, int miso_io_num, int sclk_io_num, int max_transfer_sz) {
-    spi_bus_config_t config;
+    spi_bus_config_t config = {0};
     config.mosi_io_num = mosi_io_num;
     config.miso_io_num = miso_io_num;
     config.sclk_io_num = sclk_io_num;
@@ -101,7 +101,9 @@ static WK_RESULT begin(struct spi *spi, int mosi_io_num, int miso_io_num, int sc
     config.quadhd_io_num = -1;  // -1 not used
     config.max_transfer_sz = max_transfer_sz;
     config.flags = SPICOMMON_BUSFLAG_NATIVE_PINS;
-    if(spi_bus_initialize(spi->host, &config, SPI_DMA_DISABLED) != ESP_OK) {
+    esp_err_t err = spi_bus_initialize(spi->host, &config, SPI_DMA_DISABLED);
+    if(err != ESP_OK) {
+        WK_DEBUGE(ERROR_TAG, "spi init failed, error: %s\n", esp_err_to_name(err));
         return WK_SPI_INI_FAIL;
     }  // 0 DMA not used
     return WK_OK;

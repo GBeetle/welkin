@@ -135,6 +135,7 @@ static void mpu_get_sensor_data(void* arg)
                     break;
                 default:
                     WK_DEBUGE(ERROR_TAG, "wrong command id from uart: %02x\n", rx_command_id);
+                    rx_command_id = 0x00;
             }
             if (rx_command_id >= 0x01 && rx_command_id <= 0x03)
                 uart_write_bytes(UART_NUM_0, (const uint8_t *)send_buffer, send_buffer[3] + 6);

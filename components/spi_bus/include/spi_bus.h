@@ -39,6 +39,7 @@ IN THE SOFTWARE.
  #include "sdkconfig.h"
  #include "log_sys.h"
  #include "error_handle.h"
+ #include "esp_intr_alloc.h"
 
 // Defaults
 #define SPIBUS_READ     (0x80)  /*!< addr | SPIBUS_READ  */

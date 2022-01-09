@@ -30,22 +30,22 @@ typedef int32_t WK_RESULT;
 #define CHK_RES(val) do {           \
         if (val != WK_OK) {         \
             res = val;              \
-            WK_DEBUGE(ERROR_TAG, "[CHK_RES] failed at file: %s, func: %s, line: %d, res = %08x", __FILE__, __FUNCTION__, __LINE__, val); \
+            WK_DEBUGE(CHK_TAG, "[CHK_RES] failed at file: %s, func: %s, line: %d, res = %08x", __FILE__, __FUNCTION__, __LINE__, val); \
             goto error_exit;        \
         }                           \
     } while(0)
 
 #define CHK_VAL(val) do {           \
         if (val != WK_OK) {         \
-            WK_DEBUGE(ERROR_TAG, "[CHK_VAL] failed at file: %s, func: %s, line: %d, res = %08x", __FILE__, __FUNCTION__, __LINE__, val); \
+            WK_DEBUGE(CHK_TAG, "[CHK_VAL] failed at file: %s, func: %s, line: %d, res = %08x", __FILE__, __FUNCTION__, __LINE__, val); \
         }                           \
     } while(0)
 
 #define CHK_EXIT(val) do {          \
         if (val != WK_OK) {         \
-            WK_DEBUGE(ERROR_TAG, "[CHK_VAL] failed at file: %s, func: %s, line: %d, res = %08x", __FILE__, __FUNCTION__, __LINE__, val); \
+            WK_DEBUGE(CHK_TAG, "[CHK_VAL] failed at file: %s, func: %s, line: %d, res = %08x", __FILE__, __FUNCTION__, __LINE__, val); \
+            return;                 \
         }                           \
-        return;                     \
     } while(0)
 
 #endif /* end of include guard: _WK_RESULTS__ */
