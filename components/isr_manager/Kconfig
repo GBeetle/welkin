@@ -1,0 +1,7 @@
+menu "isr manager"
+
+config ISR_MANAGER
+    bool "enable isr manager"
+    default "y"
+
+endmenu

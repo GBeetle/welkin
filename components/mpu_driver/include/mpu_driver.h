@@ -39,7 +39,6 @@
 #include "esp_err.h"
 #include "sdkconfig.h"
 #include "lis3mdl.h"
-#include "isr_manager.h"
 #include "AHRS.h"
 #include "log_sys.h"
 #include "error_handle.h"
@@ -257,6 +256,5 @@ extern const accel_fs_t accel_fs;
 extern const gyro_fs_t gyro_fs;
 extern uint8_t compass_enabled;
 extern uint8_t int_enabled;
-extern isr_manager mpu_isr_manager;
 
 #endif /* end of include guard: _MPU_9250_H__ */

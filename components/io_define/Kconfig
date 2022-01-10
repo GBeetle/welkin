@@ -1,0 +1,7 @@
+menu "io define"
+
+config IO_DEFINE
+    bool "enable io define"
+    default "y"
+
+endmenu

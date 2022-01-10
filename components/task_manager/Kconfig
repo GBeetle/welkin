@@ -1,0 +1,7 @@
+menu "task manager"
+
+config TASK_MANAGER
+    bool "enable task manager"
+    default "y"
+
+endmenu

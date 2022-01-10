@@ -132,12 +132,6 @@ static WK_RESULT setOffsets(struct mpu *mpu);
 const accel_fs_t accel_fs = ACCEL_FS_16G;
 const gyro_fs_t gyro_fs = GYRO_FS_2000DPS;
 uint8_t compass_enabled = 0;
-isr_manager mpu_isr_manager = {
-    .mpu_isr_status = DATA_NOT_READY,
-    .mpu_gyro_data_status = DATA_NOT_READY,
-    .mpu_accel_data_status = DATA_NOT_READY,
-    .mpu_mag_data_status = DATA_NOT_READY
-};
 
 
 /**

@@ -34,197 +34,13 @@
 
 #include "driver/gpio.h"
 #include "esp_intr_alloc.h"
-#include "driver/uart.h"
-#include "soc/uart_struct.h"
-#include "hal/uart_ll.h"
 
-#include "mpu_driver.h"
 #include "mpu6500_dmp.h"
 #include "motion.h"
-#include "anotic_debug.h"
 #include "log_sys.h"
-
-/*
-Pins in use. The SPI Master can use the GPIO mux, so feel free to change these if needed.
-*/
-// 11 13 12 10
-#define FSPI_MOSI 11
-#define FSPI_MISO 13
-#define FSPI_SCLK 12
-#define FSPI_CS 10
-// up to 1MHz for all registers, and 20MHz for sensor data registers only
-#define SPI_CLOCK_SPEED SPI_MASTER_FREQ_20M
-
-#define MPU_INT_ENABLE
-//#define MPU_DMP
-#define SOFT_IMU_UPDATE
-
-#define SDA 11
-#define SCL 12
-#define I2C_CLOCK_SPEED 400000  // range from 100 KHz ~ 400Hz
-
-#define MPU_DMP_INT 14
-#define GPIO_INPUT_PIN_SEL  ((1ULL<<MPU_DMP_INT))
-
-struct mpu mpu;  // create a default MPU object
-
-TaskHandle_t mpu_isr_handle;
-uint32_t isr_counter = 0;
-static uint8_t rx_command_id = 0x00;
-
-#ifdef MPU_INT_ENABLE
-static void IRAM_ATTR mpu_dmp_isr_handler(void* arg)
-{
-    mpu_isr_manager.mpu_isr_status = DATA_READY;
-    isr_counter++;
-    //ets_printf("isr before:[%s] stat:[%d] prid:[%d]\n", pcTaskGetTaskName(mpu_isr_handle), eTaskGetState(mpu_isr_handle), uxTaskPriorityGetFromISR(mpu_isr_handle));
-    //xTaskResumeFromISR(mpu_isr_handle);
-    //ets_printf("isr after:[%s] stat:[%d]\n", pcTaskGetTaskName(mpu_isr_handle), eTaskGetState(mpu_isr_handle));
-    /* Notify the task that the transmission is complete. */
-    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-    vTaskNotifyGiveFromISR(mpu_isr_handle, &xHigherPriorityTaskWoken);
-    portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
-}
-#endif
-
-static void mpu_get_sensor_data(void* arg)
-{
-    raw_axes_t accelRaw;   // x, y, z axes as int16
-    raw_axes_t gyroRaw;    // x, y, z axes as int16
-    raw_axes_t magRaw;     // x, y, z axes as int16
-    float_axes_t accelG;   // accel axes in (g) gravity format
-    float_axes_t gyroDPS;  // gyro axes in (DPS) º/s format
-    float_axes_t magDPS;   // gyro axes in (Gauss) format
-
-    while (1) {
-#ifndef CONFIG_ANOTIC_DEBUG
-        ets_printf("[SAMPLE] %u\n", isr_counter);
-#endif
-        if(mpu_isr_manager.mpu_isr_status) {
-            // Read
-            mpu.acceleration(&mpu, &accelRaw);  // fetch raw data from the registers
-            mpu.rotation(&mpu, &gyroRaw);       // fetch raw data from the registers
-            mpu.heading(&mpu, &magRaw);
-
-            // Convert
-            accelG  = accelGravity_raw(&accelRaw, accel_fs);
-            gyroDPS = gyroDegPerSec_raw(&gyroRaw, gyro_fs);
-            magDPS  = magGauss_raw(&magRaw, lis3mdl_scale_12_Gs);
-#ifdef SOFT_IMU_UPDATE
-            motion_state_t state;
-            //imuUpdate(accelG, gyroDPS, &state, 1.0 / 250);
-            imuUpdateAttitude(accelG, gyroDPS, magDPS, &state, 1.0 / 250);
-#endif
-
-#if defined CONFIG_ANOTIC_DEBUG
-            uint8_t send_buffer[100];
-            switch (rx_command_id) {
-                case 0x00:
-                    break;
-                case 0x01:
-                    anotc_init_data(send_buffer, 0x01, 6, sizeof(uint16_t), accelRaw.x, sizeof(uint16_t), accelRaw.y, sizeof(uint16_t), accelRaw.z,
-                        sizeof(uint16_t), gyroRaw.x, sizeof(uint16_t), gyroRaw.y, sizeof(uint16_t), gyroRaw.z, sizeof(uint8_t), 0x00);
-                    break;
-                case 0x02:
-                    anotc_init_data(send_buffer, 0x02, 6, sizeof(uint16_t), magRaw.x, sizeof(uint16_t), magRaw.y, sizeof(uint16_t), magRaw.z,
-                        sizeof(uint32_t), 0x00, sizeof(uint16_t), 0x00, sizeof(uint8_t), 0x00, sizeof(uint8_t), 0x00);
-                    break;
-                case 0x03:
-                    anotc_init_data(send_buffer, 0x03, 3, sizeof(uint16_t), float2int16(state.attitude.roll), sizeof(uint16_t), float2int16(state.attitude.pitch),
-                        sizeof(uint16_t), float2int16(state.attitude.yaw), sizeof(uint8_t), 0x01);
-                    break;
-                default:
-                    WK_DEBUGE(ERROR_TAG, "wrong command id from uart: %02x\n", rx_command_id);
-                    rx_command_id = 0x00;
-            }
-            if (rx_command_id >= 0x01 && rx_command_id <= 0x03)
-                uart_write_bytes(UART_NUM_0, (const uint8_t *)send_buffer, send_buffer[3] + 6);
-#else
-            WK_DEBUGD(SENSOR_TAG, "roll:%f pitch:%f yaw:%f\n", state.attitude.roll, state.attitude.pitch, state.attitude.yaw);
-#endif
-
-#ifndef CONFIG_ANOTIC_DEBUG
-            // Debug
-            WK_DEBUGD(SENSOR_TAG, "gyro: [%+7.2f %+7.2f %+7.2f ] (º/s) \t", gyroDPS.xyz[0], gyroDPS.xyz[1], gyroDPS.xyz[2]);
-            WK_DEBUGD(SENSOR_TAG, "accel: [%+6.2f %+6.2f %+6.2f ] (G) \t", accelG.data.x, accelG.data.y, accelG.data.z);
-            WK_DEBUGD(SENSOR_TAG, "mag: [%+6.2f %+6.2f %+6.2f ] (Gauss) \n", magDPS.data.x, magDPS.data.y, magDPS.data.z);
-#endif
-            mpu_isr_manager.mpu_isr_status = DATA_NOT_READY;
-        }
-        //vTaskSuspend(mpu_isr_handle);
-        /* Wait to be notified that the transmission is complete.  Note
-        the first parameter is pdTRUE, which has the effect of clearing
-        the task's notification value back to 0, making the notification
-        value act like a binary (rather than a counting) semaphore.  */
-        uint32_t ul_notification_value;
-        const TickType_t max_block_time = pdMS_TO_TICKS( 200 );
-        ul_notification_value = ulTaskNotifyTake(pdTRUE, max_block_time );
-
-        if( ul_notification_value == 1 ) {
-            /* The transmission ended as expected. */
-        }
-        else {
-            /* The call to ulTaskNotifyTake() timed out. */
-        }
-    }
-}
-
-static void test(void* arg)
-{
-    while (1) {
-        //WK_DEBUGE(ERROR_TAG, "[test idle task start] prio:[%d]\n", uxTaskPriorityGet(NULL));
-        /*
-        char task[200];
-        vTaskList(task);
-        WK_DEBUGE(ERROR_TAG, "%s\n",task);
-        */
-        vTaskDelay(100);
-        //WK_DEBUGE(ERROR_TAG, "[test idle task end]\n");
-    }
-}
-
-/*
- * Define UART interrupt subroutine to ackowledge interrupt
- */
-/*
-uint8_t rxbuf[256];
-static void uart_intr_handle(void *param)
-{
-    ets_printf("[UART_RECEIVE ISR]\n");
-    volatile uart_dev_t *uart = &UART0;
-    uart->int_clr.rxfifo_full = 1;
-    uart->int_clr.frm_err = 1;
-    uart->int_clr.rxfifo_tout = 1;
-    while (uart->status.rxfifo_cnt) {
-        uint8_t c = uart->ahb_fifo.rw_byte;
-        uart_write_bytes(UART_NUM_0, (char *)&c, 1);  //把接收的数据重新打印出来
-    }
-}
-*/
-
-// receive frame format 0xAA_ID_AA
-static void uart_rx_task(void *arg)
-{
-    const int RX_BUF_SIZE = 1024;
-    uint8_t* data = (uint8_t*)malloc(RX_BUF_SIZE + 1);
-    while (1) {
-        const int rxBytes = uart_read_bytes(UART_NUM_0, data, RX_BUF_SIZE, 1000 / portTICK_RATE_MS);
-        if (rxBytes <= 0)
-            continue;
-        if (rxBytes != 3 || data[0] != 0xaa || data[2] != 0xaa)
-            rx_command_id = 0xff;
-        else
-            rx_command_id = data[1];
-        /*
-        if (rxBytes > 0) {
-            data[rxBytes] = 0;
-            WK_DEBUGI(RX_TASK_TAG, "Read %d bytes: '%s'", rxBytes, data);
-            ESP_LOG_BUFFER_HEXDUMP(RX_TASK_TAG, data, rxBytes, ESP_LOG_INFO);
-        }
-        */
-    }
-    free(data);
-}
+#include "io_define.h"
+#include "task_manager.h"
+#include "isr_manager.h"
 
 //Main application
 void app_main(void)
@@ -262,15 +78,15 @@ void app_main(void)
     // Initialize SPI on HSPI host through SPIbus interface:
     init_spi(&fspi, SPI2_HOST);
     // disable SPI DMA in begin
-    CHK_EXIT(fspi.begin(&fspi, FSPI_MOSI, FSPI_MISO, FSPI_SCLK, SPI_MAX_DMA_LEN));
-    CHK_EXIT(fspi.addDevice(&fspi, 0, SPI_CLOCK_SPEED, FSPI_CS, &mpu_spi_handle));
+    CHK_EXIT(fspi.begin(&fspi, MPU_FSPI_MOSI, MPU_FSPI_MISO, MPU_FSPI_MPU_SCLK, SPI_MAX_DMA_LEN));
+    CHK_EXIT(fspi.addDevice(&fspi, 0, MPU_SPI_CLOCK_SPEED, MPU_FSPI_CS, &mpu_spi_handle));
 
     init_mpu(&mpu, &fspi, mpu_spi_handle);
 #endif
 
 #if defined CONFIG_MPU_I2C
     init_i2c(&i2c0, I2C_NUM_0);
-    CHK_EXIT(i2c0.begin(&i2c0, SDA, SCL, I2C_CLOCK_SPEED));
+    CHK_EXIT(i2c0.begin(&i2c0, MPU_SDA, MPU_SCL, MPU_I2C_CLOCK_SPEED));
     mpu_addr_handle_t  MPU_DEFAULT_I2CADDRESS = MPU_I2CADDRESS_AD0_LOW;
 
     init_mpu(&mpu, &i2c0, MPU_DEFAULT_I2CADDRESS);
@@ -318,7 +134,7 @@ void app_main(void)
     //interrupt of rising edge
     io_conf.intr_type = GPIO_INTR_POSEDGE;
     //bit mask of the pins, use GPIO4/5 here
-    io_conf.pin_bit_mask = GPIO_INPUT_PIN_SEL;
+    io_conf.pin_bit_mask = MPU_GPIO_INPUT_PIN_SEL;
     //set as input mode
     io_conf.mode = GPIO_MODE_INPUT;
     //enable pull-up mode
@@ -335,7 +151,6 @@ void app_main(void)
 
     xTaskCreate(mpu_get_sensor_data, "mpu_get_sensor_data", 2048, NULL, 2 | portPRIVILEGE_BIT, &mpu_isr_handle);
     xTaskCreate(uart_rx_task, "uart_rx_task", 1024*2, NULL, configMAX_PRIORITIES, NULL);
-    xTaskCreate(test, "test", 2048, NULL, 1 | portPRIVILEGE_BIT, NULL);
     //vTaskStartScheduler();
 
     /*
