@@ -1,3 +1,20 @@
+/*
+ * This file is part of welkin project (https://github.com/GBeetle/welkin).
+ * Copyright (c) 2022 GBeetle.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+ * General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ */
+
 #include "motion.h"
 
 #define ACCZ_SAMPLE		350
@@ -5,7 +22,7 @@
 static float q0 = 1.0f;	/*四元数*/
 static float q1 = 0.0f;
 static float q2 = 0.0f;
-static float q3 = 0.0f;	
+static float q3 = 0.0f;
 static float rMat[3][3];/*旋转矩阵*/
 
 float Kp = 0.4f;		/*比例增益*/
@@ -51,33 +68,33 @@ static void calBaseAcc(float* acc)	/*计算静态加速度*/
 	static float accZMin = 1.5;
 	static float accZMax = 0.5;
 	static float sumAcc[3] = {0.f};
-	
+
 	for(uint8_t i=0; i<3; i++)
 		sumAcc[i] += acc[i];
-		
+
 	if(acc[2] < accZMin)	accZMin = acc[2];
 	if(acc[2] > accZMax)	accZMax = acc[2];
-	
+
 	if(++cnt >= ACCZ_SAMPLE) /*缓冲区满*/
 	{
 		cnt = 0;
 		maxError = accZMax - accZMin;
 		accZMin = 1.5;
 		accZMax = 0.5;
-		
+
 		if(maxError < 0.015f)
 		{
 			for(uint8_t i=0; i<3; i++)
 				baseAcc[i] = sumAcc[i] / ACCZ_SAMPLE;
-			
+
 			isGravityCalibrated = true;
-			
+
 			//ledseqRun(SYS_LED, seq_calibrated);	/*校准通过指示灯*/
 		}
-		
-		for(uint8_t i=0; i<3; i++)		
-			sumAcc[i] = 0.f;		
-	}	
+
+		for(uint8_t i=0; i<3; i++)
+			sumAcc[i] = 0.f;
+	}
 }
 
 void imuUpdate(float_axes_t acc, float_axes_t gyro, motion_state_t *state , float dt)	/*数据融合 互补滤波*/
@@ -87,7 +104,7 @@ void imuUpdate(float_axes_t acc, float_axes_t gyro, motion_state_t *state , floa
 	float halfT = 0.5f * dt;
 	float accBuf[3] = {0.f};
 	float_axes_t tempacc = acc;
-	
+
 	gyro.x = gyro.x * DEG2RAD;	/* 度转弧度 */
 	gyro.y = gyro.y * DEG2RAD;
 	gyro.z = gyro.z * DEG2RAD;
@@ -105,12 +122,12 @@ void imuUpdate(float_axes_t acc, float_axes_t gyro, motion_state_t *state , floa
 		ex = (acc.y * rMat[2][2] - acc.z * rMat[2][1]);
 		ey = (acc.z * rMat[2][0] - acc.x * rMat[2][2]);
 		ez = (acc.x * rMat[2][1] - acc.y * rMat[2][0]);
-		
+
 		/*误差累计，与积分常数相乘*/
-		exInt += Ki * ex * dt ;  
+		exInt += Ki * ex * dt ;
 		eyInt += Ki * ey * dt ;
 		ezInt += Ki * ez * dt ;
-		
+
 		/*用叉积误差来做PI修正陀螺零偏，即抵消陀螺读数中的偏移量*/
 		gyro.x += Kp * ex + exInt;
 		gyro.y += Kp * ey + eyInt;
@@ -125,26 +142,26 @@ void imuUpdate(float_axes_t acc, float_axes_t gyro, motion_state_t *state , floa
 	q1 += ( q0Last * gyro.x + q2Last * gyro.z - q3Last * gyro.y) * halfT;
 	q2 += ( q0Last * gyro.y - q1Last * gyro.z + q3Last * gyro.x) * halfT;
 	q3 += ( q0Last * gyro.z + q1Last * gyro.y - q2Last * gyro.x) * halfT;
-	
+
 	/*单位化四元数*/
 	normalise = invSqrt(q0 * q0 + q1 * q1 + q2 * q2 + q3 * q3);
 	q0 *= normalise;
 	q1 *= normalise;
 	q2 *= normalise;
 	q3 *= normalise;
-	
+
 	imuComputeRotationMatrix();	/*计算旋转矩阵*/
-	
+
 	/*计算roll pitch yaw 欧拉角*/
-	state->attitude.pitch = -asinf(rMat[2][0]) * RAD2DEG; 
+	state->attitude.pitch = -asinf(rMat[2][0]) * RAD2DEG;
 	state->attitude.roll = atan2f(rMat[2][1], rMat[2][2]) * RAD2DEG;
 	state->attitude.yaw = atan2f(rMat[1][0], rMat[0][0]) * RAD2DEG;
-	
+
 	if (!isGravityCalibrated)	/*未校准*/
-	{		
+	{
 //		accBuf[0] = tempacc.x* rMat[0][0] + tempacc.y * rMat[0][1] + tempacc.z * rMat[0][2];	/*accx*/
 //		accBuf[1] = tempacc.x* rMat[1][0] + tempacc.y * rMat[1][1] + tempacc.z * rMat[1][2];	/*accy*/
 		accBuf[2] = tempacc.x* rMat[2][0] + tempacc.y * rMat[2][1] + tempacc.z * rMat[2][2];	/*accz*/
-		calBaseAcc(accBuf);		/*计算静态加速度*/				
+		calBaseAcc(accBuf);		/*计算静态加速度*/
 	}
 }

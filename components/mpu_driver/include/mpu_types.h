@@ -1,12 +1,18 @@
-// =========================================================================
-// This library is placed under the MIT License
-// Copyright 2017-2018 Natanael Josue Rabello. All rights reserved.
-// For the license information refer to LICENSE file in root directory.
-// =========================================================================
-
-/**
- * @file mpu/types.hpp
- * Declare Types and Definitions used within `mpud` namespace.
+/*
+ * This file is part of welkin project (https://github.com/GBeetle/welkin).
+ * Copyright (c) 2022 GBeetle.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+ * General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #ifndef _MPU_TYPES_H_
@@ -26,8 +32,8 @@ typedef enum {  //
 
 #ifdef CONFIG_MPU_I2C
 #include "i2c_bus.h"
-typedef struct i2c mpu_bus_t;                 
-typedef mpu_i2caddr_t mpu_addr_handle_t; 
+typedef struct i2c mpu_bus_t;
+typedef mpu_i2caddr_t mpu_addr_handle_t;
 //static const mpu_bus_t& MPU_DEFAULT_BUS                = i2c0;
 //static const mpu_addr_handle_t MPU_DEFAULT_ADDR_HANDLE = MPU_DEFAULT_I2CADDRESS;
 #elif CONFIG_MPU_SPI
@@ -499,7 +505,7 @@ typedef struct
 #endif
 } sensors_t;
 
-typedef struct  
+typedef struct
 {
 	float roll;
 	float pitch;
@@ -507,18 +513,18 @@ typedef struct
 } attitude_t;
 
 /* Orientation as a quaternion */
-typedef struct quaternion_s 
+typedef struct quaternion_s
 {
-	union 
+	union
 	{
-		struct 
+		struct
 		{
 			float q0;
 			float q1;
 			float q2;
 			float q3;
 		};
-		struct 
+		struct
 		{
 			float x;
 			float y;
