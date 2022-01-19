@@ -7,7 +7,7 @@ Pins in use. The SPI Master can use the GPIO mux, so feel free to change these i
 // MPU SPI IO 11 13 12 10
 #define MPU_FSPI_MOSI 11
 #define MPU_FSPI_MISO 13
-#define MPU_FSPI_MPU_SCLK 12
+#define MPU_FSPI_SCLK 12
 #define MPU_FSPI_CS 10
 // up to 1MHz for all registers, and 20MHz for sensor data registers only
 #define MPU_SPI_CLOCK_SPEED SPI_MASTER_FREQ_20M
@@ -41,7 +41,19 @@ Pins in use. The SPI Master can use the GPIO mux, so feel free to change these i
 #define MPU_DMP_INT 14
 #define MPU_GPIO_INPUT_PIN_SEL  ((1ULL<<MPU_DMP_INT))
 
+// BMP280
+#define BMP_I2C_FREQ_HZ 1000000 // Max 1MHz for esp-idf
+// BMP SPI IO
+#define BMP_FSPI_MOSI 35
+#define BMP_FSPI_MISO 37
+#define BMP_FSPI_SCLK 36
+#define BMP_FSPI_CS 34
+// up to 1MHz for all registers, and 20MHz for sensor data registers only
+#define BMP_SPI_CLOCK_SPEED SPI_MASTER_FREQ_20M
 
-
+// BMP I2C IO
+#define BMP_SDA 35
+#define BMP_SCL 36
+#define BMP_I2C_CLOCK_SPEED 400000  // range from 100 KHz ~ 400Hz
 
 #endif /* end of include guard: _IO_DEFINE__ */

@@ -50,6 +50,7 @@
 #include "io_define.h"
 #include "task_manager.h"
 #include "isr_manager.h"
+#include "bmp280.h"
 
 //Main application
 void app_main(void)
@@ -87,7 +88,7 @@ void app_main(void)
     // Initialize SPI on HSPI host through SPIbus interface:
     init_spi(&fspi, SPI2_HOST);
     // disable SPI DMA in begin
-    CHK_EXIT(fspi.begin(&fspi, MPU_FSPI_MOSI, MPU_FSPI_MISO, MPU_FSPI_MPU_SCLK, SPI_MAX_DMA_LEN));
+    CHK_EXIT(fspi.begin(&fspi, MPU_FSPI_MOSI, MPU_FSPI_MISO, MPU_FSPI_SCLK, SPI_MAX_DMA_LEN));
     CHK_EXIT(fspi.addDevice(&fspi, 0, MPU_SPI_CLOCK_SPEED, MPU_FSPI_CS, &mpu_spi_handle));
 
     init_mpu(&mpu, &fspi, mpu_spi_handle);
@@ -101,6 +102,37 @@ void app_main(void)
     init_mpu(&mpu, &i2c0, MPU_DEFAULT_I2CADDRESS);
 #endif
 
+#if defined CONFIG_BMP_SPI
+    spi_device_handle_t bmp_spi_handle;
+    // Initialize SPI on HSPI host through SPIbus interface:
+    init_spi(&hspi, SPI3_HOST);
+    // disable SPI DMA in begin
+    CHK_EXIT(hspi.begin(&hspi, BMP_FSPI_MOSI, BMP_FSPI_MISO, BMP_FSPI_SCLK, SPI_MAX_DMA_LEN));
+    CHK_EXIT(hspi.addDevice(&hspi, 0, BMP_SPI_CLOCK_SPEED, BMP_FSPI_CS, &bmp_spi_handle));
+
+    CHK_EXIT(bmp280_init_desc(&bmp280_device, &hspi, bmp_spi_handle));
+#endif
+
+#if defined CONFIG_BMP_I2C
+    init_i2c(&i2c1, I2C_NUM_1);
+    CHK_EXIT(i2c1.begin(&i2c1, BMP_SDA, BMP_SCL, BMP_I2C_CLOCK_SPEED));
+    bmp_i2caddr_t  BMP_DEFAULT_I2CADDRESS = BMP280_I2C_ADDRESS_0;
+
+    CHK_EXIT(bmp280_init_desc(&bmp280_device, &i2c1, BMP_DEFAULT_I2CADDRESS));
+#endif
+
+    bmp280_params_t bmp280_params;
+
+    CHK_EXIT(bmp280_init_default_params(&bmp280_params));
+    CHK_EXIT(bmp280_init(&bmp280_device, &bmp280_params));
+
+    // waitting for bmp280 initialized done
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
+
+    // bme280 has humidity sensor
+    float pressure, temperature, humidity;
+    CHK_EXIT(bmp280_read_float(&bmp280_device, &temperature, &pressure, &humidity));
+    WK_DEBUGD(BMP_TAG, "Pressure: %.2f Pa, Temperature: %.2f C", pressure, temperature);
 
     // Great! Let's verify the communication
     // (this also check if the connected MPU supports the implementation of chip selected in the component menu)

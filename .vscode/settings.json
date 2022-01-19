@@ -22,7 +22,10 @@
         "charconv": "cpp",
         "anotic_debug.h": "c",
         "log_sys.h": "c",
-        "stdarg.h": "c"
+        "stdarg.h": "c",
+        "io_define.h": "c",
+        "task_manager.h": "c",
+        "isr_manager.h": "c"
     },
     "C_Cpp.errorSquiggles": "Disabled",
     "idf.adapterTargetName": "esp32s2"

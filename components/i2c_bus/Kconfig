@@ -4,4 +4,8 @@ config MPU_I2C
     bool "enable mpu i2c"
     default "n"
 
+config BMP_I2C
+    bool "enable bmp280 i2c"
+    default "n"
+
 endmenu

@@ -44,6 +44,10 @@ typedef int32_t WK_RESULT;
 #define WK_COMPASS_W_SCALE      0x80000200
 #define WK_COMPASS_W_MODE       0x80000201
 
+#define WK_BMP_DEV_ID_ERROR     0X80000300
+#define WK_BMP_DEVICE_NULL      0x80000301
+#define WK_BMP_DEVICE_BUS_NULL  0x80000302
+
 #define CHK_RES(val) do {           \
         if (val != WK_OK) {         \
             res = val;              \
@@ -51,6 +55,22 @@ typedef int32_t WK_RESULT;
             goto error_exit;        \
         }                           \
     } while(0)
+
+#define CHK_NULL(val, error_code) do {         \
+        if (val == NULL) {         \
+            WK_DEBUGE(CHK_TAG, "[CHK_RES] failed at file: %s, func: %s, line: %d, res = %08x", __FILE__, __FUNCTION__, __LINE__, error_code); \
+            res = error_code;      \
+            goto error_exit;       \
+        }                          \
+    } while(0)
+
+#define CHK_LOGE(x, msg, ...) do { \
+        WK_RESULT __ = x; \
+        if (__ != WK_OK) { \
+            WK_DEBUGE(CHK_TAG, msg, ## __VA_ARGS__); \
+            goto error_exit; \
+        } \
+    } while (0)
 
 #define CHK_VAL(val) do {           \
         if (val != WK_OK) {         \

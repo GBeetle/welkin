@@ -19,19 +19,6 @@
 
 //#define CONFIG_SPIBUS_LOG_READWRITES
 
-
-#if defined   CONFIG_SPIBUS_LOG_RW_LEVEL_INFO
-#define SPIBUS_LOG_RW(format, ... ) WK_DEBUGI(TAG, format, ##__VA_ARGS__)
-#elif defined CONFIG_SPIBUS_LOG_RW_LEVEL_DEBUG
-#define SPIBUS_LOG_RW(format, ... ) WK_DEBUGD(TAG, format, ##__VA_ARGS__)
-#elif defined CONFIG_SPIBUS_LOG_RW_LEVEL_VERBOSE
-#define SPIBUS_LOG_RW(format, ... ) WK_DEBUGV(TAG, format, ##__VA_ARGS__)
-#endif
-#define SPIBUS_LOGE(format, ... )   WK_DEBUGE(TAG, format, ##__VA_ARGS__)
-
-
-static const char* TAG __attribute__((unused)) = "SPIbus";
-
 /*******************************************************************************
  * OBJECTS
  ******************************************************************************/
@@ -95,7 +82,7 @@ static WK_RESULT begin(struct spi *spi, int mosi_io_num, int miso_io_num, int sc
     config.quadwp_io_num = -1;  // -1 not used
     config.quadhd_io_num = -1;  // -1 not used
     config.max_transfer_sz = max_transfer_sz;
-    config.flags = SPICOMMON_BUSFLAG_NATIVE_PINS;
+    config.flags = SPICOMMON_BUSFLAG_MASTER;
     esp_err_t err = spi_bus_initialize(spi->host, &config, SPI_DMA_DISABLED);
     if(err != ESP_OK) {
         WK_DEBUGE(ERROR_TAG, "spi init failed, error: %s\n", esp_err_to_name(err));

@@ -1,0 +1,7 @@
+menu "bmp280"
+
+config BMP280
+    bool "enable bmp280 driver"
+    default "y"
+
+endmenu

@@ -272,8 +272,8 @@ static WK_RESULT readBytes(struct i2c *i2c, uint8_t devAddr, uint8_t regAddr, si
         WK_DEBUGE(ERROR_TAG, "[i2c->port:%d, slave:0x%X] Read_ %d bytes from register 0x%X, data: %s\n", i2c->port, devAddr, length, regAddr, str);
     }
     else {
-        WK_DEBUGE(ERROR_TAG, "[i2c->port:%d, slave:0x%X] Failed to read %d bytes from register 0x%X, error: 0x%X\n",
-            i2c->port, devAddr, length, regAddr, err);
+        WK_DEBUGE(ERROR_TAG, "[i2c->port:%d, slave:0x%X] Failed to read %d bytes from register 0x%X, error: %s\n",
+            i2c->port, devAddr, length, regAddr, esp_err_to_name(err));
     }
 #endif
     if (err != ESP_OK)

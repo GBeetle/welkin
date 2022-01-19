@@ -21,6 +21,7 @@ const char* SENSOR_TAG = "[SENSOR_CHECK]";
 const char* ERROR_TAG = "[ERROR]";
 const char* ST_TAG = "[SELF_TEST]";
 const char* CHK_TAG = "[CHK]";
+const char* BMP_TAG = "[BMP]";
 
 void welkin_log_system_init()
 {

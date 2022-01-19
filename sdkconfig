@@ -1197,6 +1197,12 @@ CONFIG_ANOTIC_DEBUG=y
 # end of anotic_debug
 
 #
+# bmp280
+#
+CONFIG_BMP280=y
+# end of bmp280
+
+#
 # error handle
 #
 CONFIG_ERROR_HANDLE=y
@@ -1206,7 +1212,20 @@ CONFIG_ERROR_HANDLE=y
 # i2c_bus
 #
 # CONFIG_MPU_I2C is not set
+# CONFIG_BMP_I2C is not set
 # end of i2c_bus
+
+#
+# io define
+#
+CONFIG_IO_DEFINE=y
+# end of io define
+
+#
+# isr manager
+#
+CONFIG_ISR_MANAGER=y
+# end of isr manager
 
 #
 # lis3mdl
@@ -1230,7 +1249,14 @@ CONFIG_MPU6500=y
 # spi_bus
 #
 CONFIG_MPU_SPI=y
+CONFIG_BMP_SPI=y
 # end of spi_bus
+
+#
+# task manager
+#
+CONFIG_TASK_MANAGER=y
+# end of task manager
 # end of Component config
 
 #
