@@ -22,6 +22,10 @@
 #include <stdbool.h>
 #include <error_handle.h>
 #include <mpu_types.h>
+#include <math.h>
+#include <stdlib.h>
+#include <string.h>
+#include <esp_timer.h>
 
 typedef enum {  //
     BMP280_I2C_ADDRESS_0  = 0x76, //!< I2C address when SDO pin is low,
@@ -221,6 +225,9 @@ WK_RESULT bmp280_read_float(bmp280_t *dev, float *temperature,
 
 
 /**@}*/
+
+WK_RESULT altitudeUpdate(float *altitude);
+float pressureToAltitude(const float pressure);
 
 extern bmp280_t bmp280_device;
 

@@ -352,3 +352,194 @@ WK_RESULT bmp280_read_float(bmp280_t *dev, float *temperature, float *pressure, 
 error_exit:
     return res;
 }
+
+// Quick median filter implementation
+// (c) N. Devillard - 1998
+// http://ndevilla.free.fr/median/median.pdf
+#define QMF_SORT(type,a,b) { if ((a)>(b)) QMF_SWAP(type, (a),(b)); }
+#define QMF_SWAP(type,a,b) { type temp=(a);(a)=(b);(b)=temp; }
+
+int32_t quickMedianFilter3(int32_t * v)
+{
+    int32_t p[3];
+    memcpy(p, v, sizeof(p));
+
+    QMF_SORT(int32_t, p[0], p[1]); QMF_SORT(int32_t, p[1], p[2]); QMF_SORT(int32_t, p[0], p[1]) ;
+    return p[1];
+}
+
+int16_t quickMedianFilter3_16(int16_t * v)
+{
+    int16_t p[3];
+    memcpy(p, v, sizeof(p));
+
+    QMF_SORT(int16_t, p[0], p[1]); QMF_SORT(int16_t, p[1], p[2]); QMF_SORT(int16_t, p[0], p[1]) ;
+    return p[1];
+}
+
+int32_t quickMedianFilter5(int32_t * v)
+{
+    int32_t p[5];
+    memcpy(p, v, sizeof(p));
+
+    QMF_SORT(int32_t, p[0], p[1]); QMF_SORT(int32_t, p[3], p[4]); QMF_SORT(int32_t, p[0], p[3]);
+    QMF_SORT(int32_t, p[1], p[4]); QMF_SORT(int32_t, p[1], p[2]); QMF_SORT(int32_t, p[2], p[3]);
+    QMF_SORT(int32_t, p[1], p[2]);
+    return p[2];
+}
+
+int16_t quickMedianFilter5_16(int16_t * v)
+{
+    int16_t p[5];
+    memcpy(p, v, sizeof(p));
+
+    QMF_SORT(int16_t, p[0], p[1]); QMF_SORT(int16_t, p[3], p[4]); QMF_SORT(int16_t, p[0], p[3]);
+    QMF_SORT(int16_t, p[1], p[4]); QMF_SORT(int16_t, p[1], p[2]); QMF_SORT(int16_t, p[2], p[3]);
+    QMF_SORT(int16_t, p[1], p[2]);
+    return p[2];
+}
+
+int32_t quickMedianFilter7(int32_t * v)
+{
+    int32_t p[7];
+    memcpy(p, v, sizeof(p));
+
+    QMF_SORT(int32_t, p[0], p[5]); QMF_SORT(int32_t, p[0], p[3]); QMF_SORT(int32_t, p[1], p[6]);
+    QMF_SORT(int32_t, p[2], p[4]); QMF_SORT(int32_t, p[0], p[1]); QMF_SORT(int32_t, p[3], p[5]);
+    QMF_SORT(int32_t, p[2], p[6]); QMF_SORT(int32_t, p[2], p[3]); QMF_SORT(int32_t, p[3], p[6]);
+    QMF_SORT(int32_t, p[4], p[5]); QMF_SORT(int32_t, p[1], p[4]); QMF_SORT(int32_t, p[1], p[3]);
+    QMF_SORT(int32_t, p[3], p[4]);
+    return p[3];
+}
+
+int32_t quickMedianFilter9(int32_t * v)
+{
+    int32_t p[9];
+    memcpy(p, v, sizeof(p));
+
+    QMF_SORT(int32_t, p[1], p[2]); QMF_SORT(int32_t, p[4], p[5]); QMF_SORT(int32_t, p[7], p[8]);
+    QMF_SORT(int32_t, p[0], p[1]); QMF_SORT(int32_t, p[3], p[4]); QMF_SORT(int32_t, p[6], p[7]);
+    QMF_SORT(int32_t, p[1], p[2]); QMF_SORT(int32_t, p[4], p[5]); QMF_SORT(int32_t, p[7], p[8]);
+    QMF_SORT(int32_t, p[0], p[3]); QMF_SORT(int32_t, p[5], p[8]); QMF_SORT(int32_t, p[4], p[7]);
+    QMF_SORT(int32_t, p[3], p[6]); QMF_SORT(int32_t, p[1], p[4]); QMF_SORT(int32_t, p[2], p[5]);
+    QMF_SORT(int32_t, p[4], p[7]); QMF_SORT(int32_t, p[4], p[2]); QMF_SORT(int32_t, p[6], p[4]);
+    QMF_SORT(int32_t, p[4], p[2]);
+    return p[4];
+}
+
+void arraySubInt32(int32_t *dest, int32_t *array1, int32_t *array2, int count)
+{
+    for (int i = 0; i < count; i++) {
+        dest[i] = array1[i] - array2[i];
+    }
+}
+
+static uint32_t baroCalibrationTimeout = 0;
+static bool baroCalibrationFinished = false;
+static float baroGroundAltitude = 0;
+static float baroGroundPressure = 101325.0f; // 101325 pascal, 1 standard atmosphere
+
+//气压值转换为海拔
+float pressureToAltitude(const float pressure)
+{
+    return (1.0f - pow(pressure / 101325.0f, 0.190295f)) * 4433000.0f;
+}
+
+//气压计1个标准大气压校准
+static void performBaroCalibrationCycle(float baroPressureSamp)
+{
+	//慢慢收敛校准
+    const float baroGroundPressureError = baroPressureSamp - baroGroundPressure;
+    baroGroundPressure += baroGroundPressureError * 0.15f;
+
+    if (fabs(baroGroundPressureError) < (baroGroundPressure * 0.00005f))  // 0.005% calibration error (should give c. 10cm calibration error)
+	{
+        if ((esp_timer_get_time() - baroCalibrationTimeout) > 10)
+		{
+            baroGroundAltitude = pressureToAltitude(baroGroundPressure);
+            baroCalibrationFinished = true;
+        }
+    }
+    else
+	{
+        baroCalibrationTimeout = esp_timer_get_time();
+    }
+}
+
+#define PRESSURE_SAMPLES_MEDIAN 3
+
+/*
+altitude pressure
+      0m   101325Pa
+    100m   100129Pa delta = 1196
+   1000m    89875Pa
+   1100m    88790Pa delta = 1085
+At sea level an altitude change of 100m results in a pressure change of 1196Pa, at 1000m pressure change is 1085Pa
+So set glitch threshold at 1000 - this represents an altitude change of approximately 100m.
+*/
+#define PRESSURE_DELTA_GLITCH_THRESHOLD 1000
+
+static int32_t applyBarometerMedianFilter(int32_t newPressureReading)
+{
+    static int32_t barometerFilterSamples[PRESSURE_SAMPLES_MEDIAN];
+    static int currentFilterSampleIndex = 0;
+    static bool medianFilterReady = false;
+
+    int nextSampleIndex = currentFilterSampleIndex + 1;
+    if (nextSampleIndex == PRESSURE_SAMPLES_MEDIAN)
+	{
+        nextSampleIndex = 0;
+        medianFilterReady = true;
+    }
+    int previousSampleIndex = currentFilterSampleIndex - 1;
+    if (previousSampleIndex < 0)
+	{
+        previousSampleIndex = PRESSURE_SAMPLES_MEDIAN - 1;
+    }
+    const int previousPressureReading = barometerFilterSamples[previousSampleIndex];
+
+    if (medianFilterReady)
+	{
+        if (fabs(previousPressureReading - newPressureReading) < PRESSURE_DELTA_GLITCH_THRESHOLD)
+		{
+            barometerFilterSamples[currentFilterSampleIndex] = newPressureReading;
+            currentFilterSampleIndex = nextSampleIndex;
+            return quickMedianFilter3(barometerFilterSamples);
+        }
+		else
+		{
+            // glitch threshold exceeded, so just return previous reading and don't add the glitched reading to the filter array
+            return barometerFilterSamples[previousSampleIndex];
+        }
+    }
+	else
+	{
+        barometerFilterSamples[currentFilterSampleIndex] = newPressureReading;
+        currentFilterSampleIndex = nextSampleIndex;
+        return newPressureReading;
+    }
+}
+
+WK_RESULT altitudeUpdate(float *altitude)
+{
+    WK_RESULT res = WK_OK;
+	float pressure, temperature, humidity;
+
+    CHK_RES(bmp280_read_float(&bmp280_device, &temperature, &pressure, &humidity));
+
+	//中位值滤波
+	pressure = applyBarometerMedianFilter(pressure * 10) / 10.0f;
+	if (!baroCalibrationFinished)
+	{
+		performBaroCalibrationCycle(pressure);
+		*altitude = 0.0f;
+	}
+	else
+	{
+		//计算去除地面高度后相对高度
+        *altitude = pressureToAltitude(pressure) - baroGroundAltitude;
+	}
+    *altitude = pressureToAltitude(pressure);  // just get sensor value
+error_exit:
+    return res;
+}

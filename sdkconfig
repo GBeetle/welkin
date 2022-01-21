@@ -1212,7 +1212,7 @@ CONFIG_ERROR_HANDLE=y
 # i2c_bus
 #
 # CONFIG_MPU_I2C is not set
-# CONFIG_BMP_I2C is not set
+CONFIG_BMP_I2C=y
 # end of i2c_bus
 
 #
@@ -1249,7 +1249,7 @@ CONFIG_MPU6500=y
 # spi_bus
 #
 CONFIG_MPU_SPI=y
-CONFIG_BMP_SPI=y
+# CONFIG_BMP_SPI is not set
 # end of spi_bus
 
 #

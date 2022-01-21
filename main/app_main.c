@@ -131,8 +131,12 @@ void app_main(void)
 
     // bme280 has humidity sensor
     float pressure, temperature, humidity;
-    CHK_EXIT(bmp280_read_float(&bmp280_device, &temperature, &pressure, &humidity));
-    WK_DEBUGD(BMP_TAG, "Pressure: %.2f Pa, Temperature: %.2f C", pressure, temperature);
+    for (int i = 0; i < 1; i++) {
+        CHK_EXIT(bmp280_read_float(&bmp280_device, &temperature, &pressure, &humidity));
+        WK_DEBUGD(BMP_TAG, "Pressure: %.2f Pa, Temperature: %.2f C", pressure, temperature);
+        float altitude = pressureToAltitude(pressure);
+        WK_DEBUGD(BMP_TAG, "Altitude: %.2f m", altitude);
+    }
 
     // Great! Let's verify the communication
     // (this also check if the connected MPU supports the implementation of chip selected in the component menu)

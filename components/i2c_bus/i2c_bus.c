@@ -21,9 +21,6 @@
 #include "sdkconfig.h"
 #include "log_sys.h"
 
-#define CONFIG_I2CBUS_LOG_READWRITES
-
-
 #if defined   CONFIG_I2CBUS_LOG_RW_LEVEL_INFO
 #define I2CBUS_LOG_RW(format, ...) WK_DEBUGI(TAG, format, ##__VA_ARGS__)
 #elif defined CONFIG_I2CBUS_LOG_RW_LEVEL_DEBUG
@@ -194,28 +191,11 @@ static WK_RESULT writeBytes(struct i2c *i2c, uint8_t devAddr, uint8_t regAddr, s
     i2c_master_stop(cmd);
     esp_err_t err = i2c_master_cmd_begin(i2c->port, cmd, (timeout < 0 ? i2c->ticksToWait : pdMS_TO_TICKS(timeout)));
     i2c_cmd_link_delete(cmd);
-#if defined CONFIG_I2CBUS_LOG_READWRITES
-    if (!err) {
-        char str[length*5+1];
-        for (size_t i = 0; i < length; i++) {
-            sprintf(str+i*5, "0x%s%X ", (data[i] < 0x10 ? "0" : ""), data[i]);
-            WK_DEBUGE(ERROR_TAG, "[port:%d, slave:0x%X] Write %d bytes to register 0x%X, data: %s",
-            i2c->port, devAddr, length, regAddr, str);
-        }
-    }
-#endif
-#if defined CONFIG_I2CBUS_LOG_ERRORS
-#if defined CONFIG_I2CBUS_LOG_READWRITES
-    else {
-#else
-    if (err) {
-#endif
+    if (err != ESP_OK) {
         I2CBUS_LOGE("[port:%d, slave:0x%X] Failed to write %d bytes to__ register 0x%X, error: 0x%X",
             i2c->port, devAddr, length, regAddr, err);
-    }
-#endif
-    if (err != ESP_OK)
         return WK_I2C_RW_FAIL;
+    }
     return WK_OK;
 }
 
@@ -264,20 +244,11 @@ static WK_RESULT readBytes(struct i2c *i2c, uint8_t devAddr, uint8_t regAddr, si
     i2c_master_stop(cmd);
     esp_err_t err = i2c_master_cmd_begin(i2c->port, cmd, (timeout < 0 ? i2c->ticksToWait : pdMS_TO_TICKS(timeout)));
     i2c_cmd_link_delete(cmd);
-#if defined CONFIG_I2CBUS_LOG_READWRITES
-    if (!err) {
-        char str[length*5+1];
-        for (size_t i = 0; i < length; i++)
-            sprintf(str+i*5, "0x%s%X ", (data[i] < 0x10 ? "0" : ""), data[i]);
-        WK_DEBUGE(ERROR_TAG, "[i2c->port:%d, slave:0x%X] Read_ %d bytes from register 0x%X, data: %s\n", i2c->port, devAddr, length, regAddr, str);
-    }
-    else {
+    if (err != ESP_OK) {
         WK_DEBUGE(ERROR_TAG, "[i2c->port:%d, slave:0x%X] Failed to read %d bytes from register 0x%X, error: %s\n",
             i2c->port, devAddr, length, regAddr, esp_err_to_name(err));
-    }
-#endif
-    if (err != ESP_OK)
         return WK_I2C_RW_FAIL;
+    }
     return WK_OK;
 }
 
