@@ -17,8 +17,6 @@
 
  #include "spi_bus.h"
 
-//#define CONFIG_SPIBUS_LOG_READWRITES
-
 /*******************************************************************************
  * OBJECTS
  ******************************************************************************/
@@ -182,15 +180,11 @@ static WK_RESULT writeBytes(struct spi *spi, spi_device_handle_t handle, uint8_t
     transaction.tx_buffer = data;
     transaction.rx_buffer = NULL;
     esp_err_t err = spi_device_transmit(handle, &transaction);
-#if defined CONFIG_SPIBUS_LOG_READWRITES
-    if (!err) {
+    if (err != ESP_OK) {
         char str[length*5+1];
         for(size_t i = 0; i < length; i++)
             sprintf(str+i*5, "0x%s%X ", (data[i] < 0x10 ? "0" : ""), data[i]);
         WK_DEBUGE(ERROR_TAG, "[%s, handle:0x%X] Write %d bytes to__ register 0x%X, data: %s\n", (spi->host == 1 ? "FSPI" : "HSPI"), (uint32_t)handle, length, regAddr, str);
-    }
-#endif
-    if (err != ESP_OK) {
         return WK_SPI_RW_FAIL;
     }
     return WK_OK;
@@ -240,15 +234,11 @@ static WK_RESULT readBytes(struct spi *spi, spi_device_handle_t handle, uint8_t 
     transaction.tx_buffer = NULL;
     transaction.rx_buffer = data;
     esp_err_t err = spi_device_transmit(handle, &transaction);
-#if defined CONFIG_SPIBUS_LOG_READWRITES
-    if (!err) {
+    if (err != ESP_OK) {
         char str[length*5+1];
         for(size_t i = 0; i < length; i++)
         sprintf(str+i*5, "0x%s%X ", (data[i] < 0x10 ? "0" : ""), data[i]);
         WK_DEBUGE(ERROR_TAG, "[%s, handle:0x%X] Read_ %d bytes from register 0x%X, data: %s\n", (spi->host == 1 ? "FHPI" : "HSPI"), (uint32_t)handle, length, regAddr, str);
-    }
-#endif
-    if (err != ESP_OK) {
         return WK_SPI_RW_FAIL;
     }
     return WK_OK;
