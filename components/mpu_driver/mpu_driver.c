@@ -187,35 +187,35 @@ static WK_RESULT writeBytes(struct mpu *mpu, uint8_t regAddr, size_t length, con
  * @param addr I2C address (`mpu_i2caddr_t`) or SPI device handle (`spi_device_handle_t`).
  */
 void init_mpu(struct mpu *mpu, mpu_bus_t* bus, mpu_addr_handle_t addr) {
-    mpu->bus = bus;
+    mpu->bus  = bus;
     mpu->addr = addr;
     memset(mpu->buffer, 0xff, 16);
-    mpu->err = ESP_OK;
+    mpu->err = WK_OK;
 
-    mpu->initialize = &initialize;
-    mpu->reset = &reset;
-    mpu->setSleep = &setSleep;
-    mpu->getSleep = &getSleep;
-    mpu->testConnection = &testConnection;
-    mpu->whoAmI = &whoAmI;
-    mpu->setSampleRate = &setSampleRate;
-    mpu->getSampleRate = &getSampleRate;
-    mpu->setClockSource = &setClockSource;
-    mpu->getClockSource = &getClockSource;
+    mpu->initialize              = &initialize;
+    mpu->reset                   = &reset;
+    mpu->setSleep                = &setSleep;
+    mpu->getSleep                = &getSleep;
+    mpu->testConnection          = &testConnection;
+    mpu->whoAmI                  = &whoAmI;
+    mpu->setSampleRate           = &setSampleRate;
+    mpu->getSampleRate           = &getSampleRate;
+    mpu->setClockSource          = &setClockSource;
+    mpu->getClockSource          = &getClockSource;
     mpu->setDigitalLowPassFilter = &setDigitalLowPassFilter;
     mpu->getDigitalLowPassFilter = &getDigitalLowPassFilter;
-    mpu->resetSignalPath = &resetSignalPath;
-    mpu->setLowPowerAccelMode = &setLowPowerAccelMode;
-    mpu->getLowPowerAccelMode = &getLowPowerAccelMode;
-    mpu->setLowPowerAccelRate = &setLowPowerAccelRate;
-    mpu->getLowPowerAccelRate = &getLowPowerAccelRate;
+    mpu->resetSignalPath         = &resetSignalPath;
+    mpu->setLowPowerAccelMode    = &setLowPowerAccelMode;
+    mpu->getLowPowerAccelMode    = &getLowPowerAccelMode;
+    mpu->setLowPowerAccelRate    = &setLowPowerAccelRate;
+    mpu->getLowPowerAccelRate    = &getLowPowerAccelRate;
     mpu->setMotionFeatureEnabled = &setMotionFeatureEnabled;
     mpu->getMotionFeatureEnabled = &getMotionFeatureEnabled;
-    mpu->setMotionDetectConfig = &setMotionDetectConfig;
-    mpu->getMotionDetectConfig = &getMotionDetectConfig;
+    mpu->setMotionDetectConfig   = &setMotionDetectConfig;
+    mpu->getMotionDetectConfig   = &getMotionDetectConfig;
 #if defined CONFIG_MPU6050
-    mpu->setFreeFallConfig = &setFreeFallConfig;
-    mpu->getFreeFallConfig = &getFreeFallConfig;
+    mpu->setFreeFallConfig     = &setFreeFallConfig;
+    mpu->getFreeFallConfig     = &getFreeFallConfig;
     mpu->getMotionDetectStatus = &getMotionDetectStatus;
 #endif  // MPU6050's stuff
     mpu->setStandbyMode = &setStandbyMode;
@@ -226,99 +226,99 @@ void init_mpu(struct mpu *mpu, mpu_bus_t* bus, mpu_addr_handle_t addr) {
     mpu->getFchoice = &getFchoice;
 #endif
 
-    mpu->setGyroFullScale = &setGyroFullScale;
-    mpu->getGyroFullScale = &getGyroFullScale;
+    mpu->setGyroFullScale  = &setGyroFullScale;
+    mpu->getGyroFullScale  = &getGyroFullScale;
     mpu->setAccelFullScale = &setAccelFullScale;
     mpu->getAccelFullScale = &getAccelFullScale;
-    mpu->setGyroOffset = &setGyroOffset;
-    mpu->getGyroOffset = &getGyroOffset;
-    mpu->setAccelOffset = &setAccelOffset;
-    mpu->getAccelOffset = &getAccelOffset;
-    mpu->computeOffsets = &computeOffsets;
-    mpu->acceleration = &acceleration;
-    mpu->acceleration_xyz = &acceleration_xyz;
-    mpu->rotation = &rotation;
-    mpu->rotation_xyz = &rotation_xyz;
-    mpu->temperature = &temperature;
-    mpu->motion = &motion;
-    mpu->sensors = &sensors;
-    mpu->sensors_sen = &sensors_sen;
+    mpu->setGyroOffset     = &setGyroOffset;
+    mpu->getGyroOffset     = &getGyroOffset;
+    mpu->setAccelOffset    = &setAccelOffset;
+    mpu->getAccelOffset    = &getAccelOffset;
+    mpu->computeOffsets    = &computeOffsets;
+    mpu->acceleration      = &acceleration;
+    mpu->acceleration_xyz  = &acceleration_xyz;
+    mpu->rotation          = &rotation;
+    mpu->rotation_xyz      = &rotation_xyz;
+    mpu->temperature       = &temperature;
+    mpu->motion            = &motion;
+    mpu->sensors           = &sensors;
+    mpu->sensors_sen       = &sensors_sen;
 
 #if defined CONFIG_MPU9150 || (defined CONFIG_MPU6050 && !defined CONFIG_MPU6000)
     mpu->setAuxVDDIOLevel = &setAuxVDDIOLevel;
     mpu->getAuxVDDIOLevel = &getAuxVDDIOLevel;
 #endif
-    mpu->setInterruptConfig = &setInterruptConfig;
-    mpu->getInterruptConfig = &getInterruptConfig;
-    mpu->setInterruptEnabled = &setInterruptEnabled;
-    mpu->getInterruptEnabled = &getInterruptEnabled;
-    mpu->getInterruptStatus = &getInterruptStatus;
-    mpu->setFIFOMode = &setFIFOMode;
-    mpu->getFIFOMode = &getFIFOMode;
-    mpu->setFIFOConfig = &setFIFOConfig;
-    mpu->getFIFOConfig = &getFIFOConfig;
-    mpu->setFIFOEnabled = &setFIFOEnabled;
-    mpu->getFIFOEnabled = &getFIFOEnabled;
-    mpu->resetFIFO = &resetFIFO;
-    mpu->getFIFOCount = &getFIFOCount;
-    mpu->readFIFO = &readFIFO;
-    mpu->writeFIFO = &writeFIFO;
-    mpu->setAuxI2CConfig = &setAuxI2CConfig;
-    mpu->getAuxI2CConfig = &getAuxI2CConfig;
-    mpu->setAuxI2CEnabled = &setAuxI2CEnabled;
-    mpu->setAuxI2CReset = &setAuxI2CReset;
-    mpu->getAuxI2CEnabled = &getAuxI2CEnabled;
-    mpu->setAuxI2CSlaveConfig = &setAuxI2CSlaveConfig;
-    mpu->getAuxI2CSlaveConfig = &getAuxI2CSlaveConfig;
+    mpu->setInterruptConfig    = &setInterruptConfig;
+    mpu->getInterruptConfig    = &getInterruptConfig;
+    mpu->setInterruptEnabled   = &setInterruptEnabled;
+    mpu->getInterruptEnabled   = &getInterruptEnabled;
+    mpu->getInterruptStatus    = &getInterruptStatus;
+    mpu->setFIFOMode           = &setFIFOMode;
+    mpu->getFIFOMode           = &getFIFOMode;
+    mpu->setFIFOConfig         = &setFIFOConfig;
+    mpu->getFIFOConfig         = &getFIFOConfig;
+    mpu->setFIFOEnabled        = &setFIFOEnabled;
+    mpu->getFIFOEnabled        = &getFIFOEnabled;
+    mpu->resetFIFO             = &resetFIFO;
+    mpu->getFIFOCount          = &getFIFOCount;
+    mpu->readFIFO              = &readFIFO;
+    mpu->writeFIFO             = &writeFIFO;
+    mpu->setAuxI2CConfig       = &setAuxI2CConfig;
+    mpu->getAuxI2CConfig       = &getAuxI2CConfig;
+    mpu->setAuxI2CEnabled      = &setAuxI2CEnabled;
+    mpu->setAuxI2CReset        = &setAuxI2CReset;
+    mpu->getAuxI2CEnabled      = &getAuxI2CEnabled;
+    mpu->setAuxI2CSlaveConfig  = &setAuxI2CSlaveConfig;
+    mpu->getAuxI2CSlaveConfig  = &getAuxI2CSlaveConfig;
     mpu->setAuxI2CSlaveEnabled = &setAuxI2CSlaveEnabled;
     mpu->getAuxI2CSlaveEnabled = &getAuxI2CSlaveEnabled;
-    mpu->setAuxI2CBypass = &setAuxI2CBypass;
-    mpu->getAuxI2CBypass = &getAuxI2CBypass;
-    mpu->readAuxI2CRxData = &readAuxI2CRxData;
-    mpu->restartAuxI2C = &restartAuxI2C;
-    mpu->getAuxI2CStatus = &getAuxI2CStatus;
-    mpu->auxI2CWriteByte = &auxI2CWriteByte;
-    mpu->auxI2CReadByte = &auxI2CReadByte;
-    mpu->setFsyncConfig = &setFsyncConfig;
-    mpu->getFsyncConfig = &getFsyncConfig;
-    mpu->setFsyncEnabled = &setFsyncEnabled;
-    mpu->getFsyncEnabled = &getFsyncEnabled;
-    mpu->registerDump = &registerDump;
+    mpu->setAuxI2CBypass       = &setAuxI2CBypass;
+    mpu->getAuxI2CBypass       = &getAuxI2CBypass;
+    mpu->readAuxI2CRxData      = &readAuxI2CRxData;
+    mpu->restartAuxI2C         = &restartAuxI2C;
+    mpu->getAuxI2CStatus       = &getAuxI2CStatus;
+    mpu->auxI2CWriteByte       = &auxI2CWriteByte;
+    mpu->auxI2CReadByte        = &auxI2CReadByte;
+    mpu->setFsyncConfig        = &setFsyncConfig;
+    mpu->getFsyncConfig        = &getFsyncConfig;
+    mpu->setFsyncEnabled       = &setFsyncEnabled;
+    mpu->getFsyncEnabled       = &getFsyncEnabled;
+    mpu->registerDump          = &registerDump;
 
 #if defined CONFIG_LIS3MDL
-    mpu->compassInit = &compassInit;
-    mpu->compassSetSampleMode = &compassSetSampleMode;
-    mpu->compassWhoAmI = &compassWhoAmI;
-    mpu->compassReset = &compassReset;
-    mpu->compassReadByte = &compassReadByte;
-    mpu->compassWriteByte = &compassWriteByte;
+    mpu->compassInit               = &compassInit;
+    mpu->compassSetSampleMode      = &compassSetSampleMode;
+    mpu->compassWhoAmI             = &compassWhoAmI;
+    mpu->compassReset              = &compassReset;
+    mpu->compassReadByte           = &compassReadByte;
+    mpu->compassWriteByte          = &compassWriteByte;
     mpu->compassSetMeasurementMode = &compassSetMeasurementMode;
-    mpu->setMagfullScale = &setMagfullScale;
+    mpu->setMagfullScale           = &setMagfullScale;
 
-    mpu->heading = &heading;
+    mpu->heading     = &heading;
     mpu->heading_xyz = &heading_xyz;
-    mpu->motion_mag = &motion_mag;
+    mpu->motion_mag  = &motion_mag;
 #endif
 
-    mpu->selfTest = &selfTest;
-    mpu->setGyroBias = &setGyroBias;
+    mpu->selfTest      = &selfTest;
+    mpu->setGyroBias   = &setGyroBias;
     mpu->accelSelfTest = &accelSelfTest;
-    mpu->gyroSelfTest = &gyroSelfTest;
-    mpu->getBiases = &getBiases;
-    mpu->setOffsets = &setOffsets;
+    mpu->gyroSelfTest  = &gyroSelfTest;
+    mpu->getBiases     = &getBiases;
+    mpu->setOffsets    = &setOffsets;
 
-    mpu->setBus = &setBus;
-    mpu->getBus = &getBus;
-    mpu->setAddr = &setAddr;
-    mpu->getAddr = &getAddr;
-    mpu->lastError = &lastError;
-    mpu->readBit = &readBit;
-    mpu->readBits = &readBits;
-    mpu->readByte = &readByte;
-    mpu->readBytes = &readBytes;
-    mpu->writeBit = &writeBit;
-    mpu->writeBits = &writeBits;
-    mpu->writeByte = &writeByte;
+    mpu->setBus     = &setBus;
+    mpu->getBus     = &getBus;
+    mpu->setAddr    = &setAddr;
+    mpu->getAddr    = &getAddr;
+    mpu->lastError  = &lastError;
+    mpu->readBit    = &readBit;
+    mpu->readBits   = &readBits;
+    mpu->readByte   = &readByte;
+    mpu->readBytes  = &readBytes;
+    mpu->writeBit   = &writeBit;
+    mpu->writeBits  = &writeBits;
+    mpu->writeByte  = &writeByte;
     mpu->writeBytes = &writeBytes;
 }
 
@@ -527,7 +527,6 @@ bool getSleep(struct mpu *mpu)
  * @return
  *  - `WK_OK`: The mpu is connected and matchs the model.
  *  - `WK_MPU_NOT_FOUND`: A device is connect, but does not match the chip selected in _menuconfig_.
- *  - May return other communication bus errors. e.g: `ESP_FAIL`, `ESP_ERR_TIMEOUT`.
  * */
 static WK_RESULT testConnection(struct mpu *mpu)
 {
@@ -1842,7 +1841,7 @@ static WK_RESULT readAuxI2CRxData(struct mpu *mpu, size_t length, uint8_t* data,
     WK_RESULT res = WK_OK;
     if (length + skip > 24) {
         WK_DEBUGE(ERROR_TAG, "INVALID_LENGTH,  %d, mpu has only 24 external sensor data registers!", length);
-        return mpu->err = ESP_ERR_INVALID_SIZE;
+        return mpu->err = WK_MPU_AUX_RW_FAIL;
     }
 // check if I2C Master is enabled, just for warning and debug
     const bool kAuxI2CEnabled = getAuxI2CEnabled(mpu);
@@ -1885,9 +1884,9 @@ auxi2c_stat_t getAuxI2CStatus(struct mpu *mpu)
  * @attention Auxiliary I2C Master must have already been configured before calling this function.
  *
  * @return
- *  - `ESP_ERR_INVALID_STATE`: Auxiliary I2C Master not enabled;
- *  - `ESP_ERR_NOT_FOUND`:     Slave doesn't ACK the transfer;
- *  - `ESP_FAIL`:               Auxiliary I2C Master lost arbitration of the bus;
+ *  - `WK_MPU_AUX_NOT_ENABLE`: Auxiliary I2C Master not enabled;
+ *  - `WK_MPU_AUX_NOT_FOUND`:  Slave doesn't ACK the transfer;
+ *  - `WK_MPU_AUX_LOST_ARB`:   Auxiliary I2C Master lost arbitration of the bus;
  *  - or other standard I2C driver error codes.
  * */
 static WK_RESULT auxI2CWriteByte(struct mpu *mpu, uint8_t devAddr, uint8_t regAddr, const uint8_t data)
@@ -1898,7 +1897,7 @@ static WK_RESULT auxI2CWriteByte(struct mpu *mpu, uint8_t devAddr, uint8_t regAd
     CHK_RES(mpu->lastError(mpu));
     if (!kAuxI2CEnabled) {
         WK_DEBUGE(ERROR_TAG, "AUX_I2C_DISABLED, , must enable first\n");
-        return mpu->err = ESP_ERR_INVALID_STATE;
+        return mpu->err = WK_MPU_AUX_NOT_ENABLE;
     }
     // data for I2C_SLV4_ADDR
     mpu->buffer[0] = AUXI2C_WRITE << I2C_SLV_RNW_BIT;
@@ -1921,15 +1920,15 @@ static WK_RESULT auxI2CWriteByte(struct mpu *mpu, uint8_t devAddr, uint8_t regAd
         CHK_RES(mpu->readByte(mpu, I2C_MST_STATUS, &status));
         if (status & (1 << I2CMST_STAT_SLV4_NACK_BIT)) {
             WK_DEBUGE(ERROR_TAG, "AUX_I2C_SLAVE_NACK, %02x\n", (uint8_t)status);
-            return mpu->err = ESP_ERR_NOT_FOUND;
+            return mpu->err = WK_MPU_AUX_NOT_FOUND;
         }
         if (status & (1 << I2CMST_STAT_LOST_ARB_BIT)) {
             WK_DEBUGE(ERROR_TAG, "AUX_I2C_LOST_ARB, ");
-            return mpu->err = ESP_FAIL;
+            return mpu->err = WK_MPU_AUX_LOST_ARB;
         }
         if (xTaskGetTickCount() >= endTick) {
             WK_DEBUGE(ERROR_TAG, "TIMEOUT, . Aux I2C might've hung. Restart it.");
-            return mpu->err = ESP_ERR_TIMEOUT;
+            return mpu->err = WK_MPU_AUX_RW_TIMEOUT;
         }
     } while (!(status & (1 << I2C_SLV4_DONE_INT_BIT)));
 error_exit:
@@ -1945,9 +1944,9 @@ error_exit:
  * @attention Auxiliary I2C Master must have already been configured before calling this function.
  *
  * @return
- *  - ESP_ERR_INVALID_STATE  Auxiliary I2C Master not enabled;
- *  - ESP_ERR_NOT_FOUND      Slave doesn't ACK the transfer;
- *  - ESP_FAIL               Auxiliary I2C Master lost arbitration of the bus;
+ *  - WK_MPU_AUX_NOT_ENABLE  Auxiliary I2C Master not enabled;
+ *  - WK_MPU_AUX_NOT_FOUND      Slave doesn't ACK the transfer;
+ *  - WK_MPU_AUX_LOST_ARB               Auxiliary I2C Master lost arbitration of the bus;
  *  - or other standard I2C driver error codes.
  * */
 static WK_RESULT auxI2CReadByte(struct mpu *mpu, uint8_t devAddr, uint8_t regAddr, uint8_t* data)
@@ -1958,7 +1957,7 @@ static WK_RESULT auxI2CReadByte(struct mpu *mpu, uint8_t devAddr, uint8_t regAdd
     CHK_RES(mpu->lastError(mpu));
     if (!kAuxI2CEnabled) {
         WK_DEBUGE(ERROR_TAG, "AUX_I2C_DISABLED, , must enable first\n");
-        return mpu->err = ESP_ERR_INVALID_STATE;
+        return mpu->err = WK_MPU_AUX_NOT_ENABLE;
     }
     // data for I2C_SLV4_ADDR
     mpu->buffer[0] = AUXI2C_READ << I2C_SLV_RNW_BIT;
@@ -1979,15 +1978,15 @@ static WK_RESULT auxI2CReadByte(struct mpu *mpu, uint8_t devAddr, uint8_t regAdd
         CHK_RES(mpu->readByte(mpu, I2C_MST_STATUS, &status));
         if (status & (1 << I2CMST_STAT_SLV4_NACK_BIT)) {
             WK_DEBUGE(ERROR_TAG, "AUX_I2C_SLAVE_NACK, %02x\n", (uint8_t)status);
-            return mpu->err = ESP_ERR_NOT_FOUND;
+            return mpu->err = WK_MPU_AUX_NOT_FOUND;
         }
         if (status & (1 << I2CMST_STAT_LOST_ARB_BIT)) {
             WK_DEBUGE(ERROR_TAG, "AUX_I2C_LOST_ARB, ");
-            return mpu->err = ESP_FAIL;
+            return mpu->err = WK_MPU_AUX_LOST_ARB;
         }
         if (xTaskGetTickCount() >= endTick) {
             WK_DEBUGE(ERROR_TAG, "TIMEOUT, . Aux I2C might've hung. Restart it.");
-            return mpu->err = ESP_ERR_TIMEOUT;
+            return mpu->err = WK_MPU_AUX_RW_TIMEOUT;
         }
     } while (!(status & (1 << I2C_SLV4_DONE_INT_BIT)));
     // get read value

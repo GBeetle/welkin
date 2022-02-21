@@ -31,6 +31,7 @@ extern const char* ERROR_TAG;
 extern const char* ST_TAG;
 extern const char* CHK_TAG;
 extern const char* BMP_TAG;
+extern const char* RF24_TAG;
 
 void welkin_log_system_init(void);
 

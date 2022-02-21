@@ -51,6 +51,7 @@
 #include "task_manager.h"
 #include "isr_manager.h"
 #include "bmp280.h"
+#include "nrf24_interface.h"
 
 //Main application
 void app_main(void)
@@ -67,21 +68,6 @@ void app_main(void)
     };
     ESP_ERROR_CHECK(uart_driver_install(UART_NUM_0, 2*1024, 0, 0, NULL, 0));
     ESP_ERROR_CHECK(uart_param_config(UART_NUM_0, &uart_config));
-    /*
-    // release the pre registered UART handler/subroutine
-	ESP_ERROR_CHECK(uart_isr_free(UART_NUM_0));
-	// register new UART subroutine
-    uart_intr_config_t uart_isr_config = {
-        .intr_enable_mask         = UART_INTR_RXFIFO_FULL,
-        .rx_timeout_thresh        = 120,
-        .txfifo_empty_intr_thresh = 10,
-        .rxfifo_full_thresh       = 10,
-    };
-    ESP_ERROR_CHECK(uart_intr_config(UART_NUM_0, &uart_isr_config));
-	ESP_ERROR_CHECK(uart_isr_register(UART_NUM_0, uart_intr_handle, NULL, 0, NULL));
-	// enable RX interrupt
-	ESP_ERROR_CHECK(uart_enable_rx_intr(UART_NUM_0));
-    */
 
 #if defined CONFIG_MPU_SPI
     spi_device_handle_t mpu_spi_handle;
@@ -89,7 +75,7 @@ void app_main(void)
     init_spi(&fspi, SPI2_HOST);
     // disable SPI DMA in begin
     CHK_EXIT(fspi.begin(&fspi, MPU_FSPI_MOSI, MPU_FSPI_MISO, MPU_FSPI_SCLK, SPI_MAX_DMA_LEN));
-    CHK_EXIT(fspi.addDevice(&fspi, 0, MPU_SPI_CLOCK_SPEED, MPU_FSPI_CS, &mpu_spi_handle));
+    CHK_EXIT(fspi.addDevice(&fspi, 8, 0, MPU_SPI_CLOCK_SPEED, MPU_FSPI_CS, &mpu_spi_handle));
 
     init_mpu(&mpu, &fspi, mpu_spi_handle);
 #endif
@@ -107,8 +93,8 @@ void app_main(void)
     // Initialize SPI on HSPI host through SPIbus interface:
     init_spi(&hspi, SPI3_HOST);
     // disable SPI DMA in begin
-    CHK_EXIT(hspi.begin(&hspi, BMP_FSPI_MOSI, BMP_FSPI_MISO, BMP_FSPI_SCLK, SPI_MAX_DMA_LEN));
-    CHK_EXIT(hspi.addDevice(&hspi, 0, BMP_SPI_CLOCK_SPEED, BMP_FSPI_CS, &bmp_spi_handle));
+    CHK_EXIT(hspi.begin(&hspi, BMP_HSPI_MOSI, BMP_HSPI_MISO, BMP_HSPI_SCLK, SPI_MAX_DMA_LEN));
+    CHK_EXIT(hspi.addDevice(&hspi, 8, 0, BMP_SPI_CLOCK_SPEED, BMP_HSPI_CS, &bmp_spi_handle));
 
     CHK_EXIT(bmp280_init_desc(&bmp280_device, &hspi, bmp_spi_handle));
 #endif
@@ -146,6 +132,42 @@ void app_main(void)
     }
     //WK_DEBUGI(TAG, "MPU connection successful!");
 
+    /* test for NRF24+ commnuitation */
+    rf24_init(&radio);
+    // Let these addresses be used for the pair
+    uint8_t address[][6] = {"1Node", "2Node"};
+    float payload = 0.0;
+    // to use different addresses on a pair of radios, we need a variable to
+    // uniquely identify which address this radio will use to transmit
+    bool radioNumber = 1; // 0 uses address[0] to transmit, 1 uses address[1] to transmit
+    // Used to control whether this node is sending or receiving
+    bool role = false;  // true = TX role, false = RX role
+
+    //radio.printDetails(&radio);
+
+    CHK_EXIT(radio.begin(&radio));
+    // Set the PA Level low to try preventing power supply related problems
+    // because these examples are likely run with nodes in close proximity to
+    // each other.
+    CHK_EXIT(radio.setPALevel(&radio, RF24_PA_LOW, true));  // RF24_PA_MAX is default.
+
+    // save on transmission time by setting the radio to only transmit the
+    // number of bytes we need to transmit a float
+    CHK_EXIT(radio.setPayloadSize(&radio, sizeof(payload))); // float datatype occupies 4 bytes
+
+    // set the TX address of the RX node into the TX pipe
+    CHK_EXIT(radio.openWritingPipeAddr(&radio, address[radioNumber]));     // always uses pipe 0
+
+    // set the RX address of the TX node into a RX pipe
+    CHK_EXIT(radio.openReadingPipeAddr(&radio, 1, address[!radioNumber])); // using pipe 1
+
+    // additional setup specific to the node's role
+    if (role) {
+        CHK_EXIT(radio.stopListening(&radio));  // put radio in TX mode
+    } else {
+        CHK_EXIT(radio.startListening(&radio)); // put radio in RX mode
+    }
+
     // Initialize
     CHK_EXIT(mpu.initialize(&mpu));  // initialize the chip and set initial configurations
     CHK_EXIT(mpu_rw_test(&mpu));
@@ -164,12 +186,6 @@ void app_main(void)
     }
 
     CHK_EXIT(mpu.setGyroBias(&mpu));
-
-    //printf("Start to set Offset\n");
-    //CHK_EXIT(mpu.setOffsets(&mpu));
-    //raw_axes_t acc;
-    //memset(&acc, 0x3f, sizeof(acc));
-    //mpu.setGyroOffset(&mpu, acc);
 
     //CHK_EXIT(dmp_initialize(&mpu));
 

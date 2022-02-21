@@ -62,9 +62,9 @@ struct i2c {
      * @param  scl_pullup_en [Enable internal pullup on SCL line]
      * @param  clk_speed     [i2c clock frequency for master mode, (no higher than 1MHz for now), Default 100KHz]
      *                       @see "driver/i2c.h"
-     * @return               - ESP_OK   Success
-     *                       - ESP_ERR_INVALID_ARG Parameter error
-     *                       - ESP_FAIL Driver install error
+     * @return               - WK_OK   Success
+     *                       - WK_I2C_CFG_FAIL Parameter error
+     *                       - WK_I2C_INS_FAIL Driver install error
      */
     WK_RESULT (*begin)(struct i2c *i2c, gpio_num_t sda_io_num, gpio_num_t scl_io_num, uint32_t clk_speed);
 
@@ -87,7 +87,7 @@ struct i2c {
      * *** WRITING interface ***
      * @brief  i2c commands for writing to a 8-bit slave device register.
      *         All of them returns standard esp_err_t codes. So it can be used
-     *         with ESP_ERROR_CHECK();
+     *         with CHK_RES();
      * @param  devAddr   [i2c slave device register]
      * @param  regAddr   [Register address to write to]
      * @param  bitNum    [Bit position number to write to (bit 7~0)]
@@ -96,11 +96,8 @@ struct i2c {
      * @param  length    [Number of bytes to write (should be within the data buffer size)]
      *                   [writeBits() -> Number of bits after bitStart (including)]
      * @param  timeout   [Custom timeout for the particular call]
-     * @return  - ESP_OK Success
-     *          - ESP_ERR_INVALID_ARG Parameter error
-     *          - ESP_FAIL Sending command error, slave doesn't ACK the transfer.
-     *          - ESP_ERR_INVALID_STATE i2c driver not installed or not in master mode.
-     *          - ESP_ERR_TIMEOUT Operation timeout because the bus is busy.
+     * @return  - WK_OK Success
+     *          - WK_I2C_RW_FAIL   i2c read/wirte failed
      */
     WK_RESULT (*writeBit)(struct i2c *i2c, uint8_t devAddr, uint8_t regAddr, uint8_t bitNum, uint8_t data);
     WK_RESULT (*writeBits)(struct i2c *i2c, uint8_t devAddr, uint8_t regAddr, uint8_t bitStart, uint8_t length, uint8_t data);
@@ -111,7 +108,7 @@ struct i2c {
      * *** READING interface ***
      * @breif  i2c commands for reading a 8-bit slave device register.
      *         All of them returns standard esp_err_t codes.So it can be used
-     *         with ESP_ERROR_CHECK();
+     *         with CHK_RES();
      * @param  devAddr   [i2c slave device register]
      * @param  regAddr   [Register address to read from]
      * @param  bitNum    [Bit position number to write to (bit 7~0)]
@@ -119,11 +116,8 @@ struct i2c {
      * @param  data      [Buffer to store the read value(s)]
      * @param  length    [Number of bytes to read (should be within the data buffer size)]
      * @param  timeout   [Custom timeout for the particular call]
-     * @return  - ESP_OK Success
-     *          - ESP_ERR_INVALID_ARG Parameter error
-     *          - ESP_FAIL Sending command error, slave doesn't ACK the transfer.
-     *          - ESP_ERR_INVALID_STATE i2c driver not installed or not in master mode.
-     *          - ESP_ERR_TIMEOUT Operation timeout because the bus is busy.]
+     * @return  - WK_OK Success
+     *          - WK_I2C_RW_FAIL   i2c read/wirte failed
      */
     WK_RESULT (*readBit)(struct i2c *i2c, uint8_t devAddr, uint8_t regAddr, uint8_t bitNum, uint8_t *data);
     WK_RESULT (*readBits)(struct i2c *i2c, uint8_t devAddr, uint8_t regAddr, uint8_t bitStart, uint8_t length, uint8_t *data);
@@ -134,11 +128,8 @@ struct i2c {
      * @brief  Quick check to see if a slave device responds.
      * @param  devAddr   [i2c slave device register]
      * @param  timeout   [Custom timeout for the particular call]
-     * @return  - ESP_OK Success
-     *          - ESP_ERR_INVALID_ARG Parameter error
-     *          - ESP_FAIL Sending command error, slave doesn't ACK the transfer.
-     *          - ESP_ERR_INVALID_STATE i2c driver not installed or not in master mode.
-     *          - ESP_ERR_TIMEOUT Operation timeout because the bus is busy.]
+     * @return  - WK_OK Success
+     *          - WK_I2C_CONNECT_FAIL   i2c connect failed
      */
     WK_RESULT (*testConnection)(struct i2c *i2c, uint8_t devAddr, int32_t timeout);
 

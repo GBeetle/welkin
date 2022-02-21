@@ -27,8 +27,8 @@ struct spi hspi;
 
 static WK_RESULT begin(struct spi *spi, int mosi_io_num, int miso_io_num, int sclk_io_num, int max_transfer_sz);
 static WK_RESULT close(struct spi *spi);
-static WK_RESULT addDevice(struct spi *spi, uint8_t mode, uint32_t clock_speed_hz, int cs_io_num, spi_device_handle_t *handle);
-static WK_RESULT addDevice_cfg(struct spi *spi, spi_device_interface_config_t *dev_config, spi_device_handle_t *handle);
+static WK_RESULT addDevice(struct spi *spi, uint8_t address_len, uint8_t mode, uint32_t clock_speed_hz, int cs_io_num, spi_device_handle_t *handle);
+static WK_RESULT addDevice_cfg(struct spi *spi, uint8_t address_len, spi_device_interface_config_t *dev_config, spi_device_handle_t *handle);
 static WK_RESULT removeDevice(struct spi *spi, spi_device_handle_t handle);
 /*******************************************************************************
  * WRITING
@@ -44,6 +44,7 @@ static WK_RESULT readBit(struct spi *spi, spi_device_handle_t handle, uint8_t re
 static WK_RESULT readBits(struct spi *spi, spi_device_handle_t handle, uint8_t regAddr, uint8_t bitStart, uint8_t length, uint8_t *data);
 static WK_RESULT readByte(struct spi *spi, spi_device_handle_t handle, uint8_t regAddr, uint8_t *data);
 static WK_RESULT readBytes(struct spi *spi, spi_device_handle_t handle, uint8_t regAddr, size_t length, uint8_t *data);
+static WK_RESULT readWriteBytes(struct spi *spi, spi_device_handle_t handle, uint8_t regAddr, size_t length, uint8_t *r_data, uint8_t *w_data);
 
 /* Get default objects */
 struct spi* getSPI(spi_host_device_t host) {
@@ -54,20 +55,21 @@ struct spi* getSPI(spi_host_device_t host) {
  * SETUP
  ******************************************************************************/
 void init_spi(struct spi *spi, spi_host_device_t host){
-    spi->host = host;
-    spi->begin = &begin;
-    spi->close = &close;
-    spi->addDevice = &addDevice;
-    spi->addDevice_cfg = &addDevice_cfg;
-    spi->removeDevice = &removeDevice;
-    spi->writeBit = &writeBit;
-    spi->writeBits = &writeBits;
-    spi->writeByte = &writeByte;
-    spi->writeBytes = &writeBytes;
-    spi->readBit = &readBit;
-    spi->readBits = &readBits;
-    spi->readByte = &readByte;
-    spi->readBytes = &readBytes;
+    spi->host           = host;
+    spi->begin          = &begin;
+    spi->close          = &close;
+    spi->addDevice      = &addDevice;
+    spi->addDevice_cfg  = &addDevice_cfg;
+    spi->removeDevice   = &removeDevice;
+    spi->writeBit       = &writeBit;
+    spi->writeBits      = &writeBits;
+    spi->writeByte      = &writeByte;
+    spi->writeBytes     = &writeBytes;
+    spi->readBit        = &readBit;
+    spi->readBits       = &readBits;
+    spi->readByte       = &readByte;
+    spi->readBytes      = &readBytes;
+    spi->readWriteBytes = &readWriteBytes;
     // must delay some time ??? don't know why
     vTaskDelay(10 / portTICK_PERIOD_MS);
 }
@@ -96,10 +98,10 @@ static WK_RESULT close(struct spi *spi) {
     return WK_OK;
 }
 
-static WK_RESULT addDevice(struct spi *spi, uint8_t mode, uint32_t clock_speed_hz, int cs_io_num, spi_device_handle_t *handle) {
+static WK_RESULT addDevice(struct spi *spi, uint8_t address_len, uint8_t mode, uint32_t clock_speed_hz, int cs_io_num, spi_device_handle_t *handle) {
     spi_device_interface_config_t dev_config;
     dev_config.command_bits = 0;
-    dev_config.address_bits = 8;
+    dev_config.address_bits = address_len;
     dev_config.dummy_bits = 0;
     dev_config.mode = mode;
     dev_config.duty_cycle_pos = 128;  // default 128 = 50%/50% duty
@@ -117,8 +119,8 @@ static WK_RESULT addDevice(struct spi *spi, uint8_t mode, uint32_t clock_speed_h
     return WK_OK;
 }
 
-static WK_RESULT addDevice_cfg(struct spi *spi, spi_device_interface_config_t *dev_config, spi_device_handle_t *handle) {
-    dev_config->address_bits = 8;  // must be set, SPIbus uses this 8-bits to send the regAddr
+static WK_RESULT addDevice_cfg(struct spi *spi, uint8_t address_len, spi_device_interface_config_t *dev_config, spi_device_handle_t *handle) {
+    dev_config->address_bits = address_len;  // must be set, SPIbus uses this 8-bits to send the regAddr
     if (spi_bus_add_device(spi->host, dev_config, handle) != ESP_OK) {
         return WK_SPI_CFG_FAIL;
     }
@@ -223,7 +225,7 @@ error_exit:
 }
 
 static WK_RESULT readBytes(struct spi *spi, spi_device_handle_t handle, uint8_t regAddr, size_t length, uint8_t *data) {
-    if(length == 0) return ESP_ERR_INVALID_SIZE;
+    if(length == 0) return WK_SPI_INVALID_SIZE;
     spi_transaction_t transaction;
     transaction.flags = 0;
     transaction.cmd = 0;
@@ -237,8 +239,34 @@ static WK_RESULT readBytes(struct spi *spi, spi_device_handle_t handle, uint8_t 
     if (err != ESP_OK) {
         char str[length*5+1];
         for(size_t i = 0; i < length; i++)
-        sprintf(str+i*5, "0x%s%X ", (data[i] < 0x10 ? "0" : ""), data[i]);
+            sprintf(str+i*5, "0x%s%X ", (data[i] < 0x10 ? "0" : ""), data[i]);
         WK_DEBUGE(ERROR_TAG, "[%s, handle:0x%X] Read_ %d bytes from register 0x%X, data: %s\n", (spi->host == 1 ? "FHPI" : "HSPI"), (uint32_t)handle, length, regAddr, str);
+        return WK_SPI_RW_FAIL;
+    }
+    return WK_OK;
+}
+
+static WK_RESULT readWriteBytes(struct spi *spi, spi_device_handle_t handle, uint8_t regAddr, size_t length, uint8_t *r_data, uint8_t *w_data) {
+    if(length == 0) return WK_SPI_INVALID_SIZE;
+    spi_transaction_t transaction;
+    transaction.flags = 0;
+    transaction.cmd = 0;
+    transaction.addr = regAddr;
+    transaction.length = length * 8;
+    transaction.rxlength = length * 8;
+    transaction.user = NULL;
+    transaction.tx_buffer = w_data;
+    transaction.rx_buffer = r_data;
+    esp_err_t err = spi_device_transmit(handle, &transaction);
+    if (err != ESP_OK) {
+        char rstr[length*5+1];
+        char wstr[length*5+1];
+        for(size_t i = 0; i < length; i++) {
+            sprintf(rstr+i*5, "0x%s%X ", (r_data[i] < 0x10 ? "0" : ""), r_data[i]);
+            sprintf(wstr+i*5, "0x%s%X ", (w_data[i] < 0x10 ? "0" : ""), w_data[i]);
+        }
+        WK_DEBUGE(ERROR_TAG, "[%s, handle:0x%X] Read_ %d bytes from register 0x%X, data: %s\n", (spi->host == 1 ? "FHPI" : "HSPI"), (uint32_t)handle, length, regAddr, rstr);
+        WK_DEBUGE(ERROR_TAG, "[%s, handle:0x%X] Write %d bytes to__ register 0x%X, data: %s\n", (spi->host == 1 ? "FSPI" : "HSPI"), (uint32_t)handle, length, regAddr, wstr);
         return WK_SPI_RW_FAIL;
     }
     return WK_OK;

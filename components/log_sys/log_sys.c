@@ -22,6 +22,7 @@ const char* ERROR_TAG = "[ERROR]";
 const char* ST_TAG = "[SELF_TEST]";
 const char* CHK_TAG = "[CHK]";
 const char* BMP_TAG = "[BMP]";
+const char* RF24_TAG = "[RF24]";
 
 void welkin_log_system_init()
 {
@@ -29,5 +30,6 @@ void welkin_log_system_init()
     esp_log_level_set(ERROR_TAG, ESP_LOG_ERROR);
     esp_log_level_set(ST_TAG, ESP_LOG_ERROR);
     esp_log_level_set(CHK_TAG, ESP_LOG_ERROR);
+    esp_log_level_set(RF24_TAG, ESP_LOG_DEBUG);
 }
 

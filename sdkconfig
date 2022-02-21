@@ -1246,10 +1246,17 @@ CONFIG_MPU6500=y
 # end of mpu_driver
 
 #
+# nrf24
+#
+CONFIG_NFR24=y
+# end of nrf24
+
+#
 # spi_bus
 #
 CONFIG_MPU_SPI=y
 # CONFIG_BMP_SPI is not set
+CONFIG_NRF24_SPI=y
 # end of spi_bus
 
 #

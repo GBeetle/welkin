@@ -8,4 +8,8 @@ menu "spi_bus"
         bool "enable bmp280 spi"
         default "y"
 
+    config NRF24_SPI
+        bool "enable nrf24 spi"
+        default "y"
+
 endmenu

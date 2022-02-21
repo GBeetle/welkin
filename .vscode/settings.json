@@ -28,5 +28,6 @@
         "isr_manager.h": "c"
     },
     "C_Cpp.errorSquiggles": "Disabled",
-    "idf.adapterTargetName": "esp32s2"
+    "idf.adapterTargetName": "esp32s2",
+    "idf.portWin": "COM3"
 }

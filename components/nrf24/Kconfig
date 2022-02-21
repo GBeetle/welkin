@@ -1,0 +1,7 @@
+menu "nrf24"
+
+config NFR24
+    bool "enable nrf24"
+    default "y"
+
+endmenu
