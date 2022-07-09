@@ -53,6 +53,47 @@
 #include "bmp280.h"
 #include "nrf24_interface.h"
 
+// Let these addresses be used for the pair
+uint8_t address[][6] = {"1Node", "2Node"};
+float payload = 0.0;
+// to use different addresses on a pair of radios, we need a variable to
+// uniquely identify which address this radio will use to transmit
+bool radioNumber = 0; // 0 uses address[0] to transmit, 1 uses address[1] to transmit
+// Used to control whether this node is sending or receiving
+bool role = false;  // true = TX role, false = RX role
+
+void loop(void* arg)
+{
+    while (true) {
+        if (role) {
+            ESP_LOGI(RF24_TAG, "Transmission begin! ");  // payload was delivered
+            // This device is a TX node
+            WK_RESULT report = radio.write(&radio, &payload, sizeof(float));  // transmit & save the report
+
+            if (report >= 0) {
+                ESP_LOGI(RF24_TAG, "Transmission successful! ");  // payload was delivered
+                payload += 0.01;          // increment float payload
+            } else {
+                ESP_LOGI(RF24_TAG, "Transmission failed or timed out");  // payload was not delivered
+            }
+            // to make this example readable in the serial monitor
+            // slow transmissions down by 1 second
+            // vTaskDelay(1000 / portTICK_PERIOD_MS);
+        } else {
+            // This device is a RX node
+            uint8_t pipe;
+            if (radio.available(&radio, &pipe)) {              // is there a payload? get the pipe number that recieved it
+                uint8_t bytes = radio.getPayloadSize(&radio);  // get the size of the payload
+                radio.read(&radio, &payload, bytes);           // fetch payload from FIFO
+                ESP_LOGI(RF24_TAG, "Received data");
+            }
+            else
+                ESP_LOGI(RF24_TAG, "Received nothing...");
+        }
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
+    }
+}
+
 //Main application
 void app_main(void)
 {
@@ -69,6 +110,38 @@ void app_main(void)
     ESP_ERROR_CHECK(uart_driver_install(UART_NUM_0, 2*1024, 0, 0, NULL, 0));
     ESP_ERROR_CHECK(uart_param_config(UART_NUM_0, &uart_config));
 
+    /* test for NRF24+ commnuitation */
+    rf24_init(&radio);
+
+    //radio.printDetails(&radio);
+
+    CHK_EXIT(radio.begin(&radio));
+    // Set the PA Level low to try preventing power supply related problems
+    // because these examples are likely run with nodes in close proximity to
+    // each other.
+    CHK_EXIT(radio.setPALevel(&radio, RF24_PA_LOW, true));  // RF24_PA_MAX is default.
+
+    // save on transmission time by setting the radio to only transmit the
+    // number of bytes we need to transmit a float
+    CHK_EXIT(radio.setPayloadSize(&radio, sizeof(payload))); // float datatype occupies 4 bytes
+
+    // set the TX address of the RX node into the TX pipe
+    CHK_EXIT(radio.openWritingPipeAddr(&radio, address[radioNumber]));     // always uses pipe 0
+
+    // set the RX address of the TX node into a RX pipe
+    CHK_EXIT(radio.openReadingPipeAddr(&radio, 1, address[!radioNumber])); // using pipe 1
+
+    // additional setup specific to the node's role
+    if (role) {
+        CHK_EXIT(radio.stopListening(&radio));  // put radio in TX mode
+    } else {
+        CHK_EXIT(radio.startListening(&radio)); // put radio in RX mode
+    }
+
+    ESP_LOGI(RF24_TAG, "NRF24 initialization DONE");
+
+    xTaskCreate(loop, "nrf24_loop", 2048, NULL, 2 | portPRIVILEGE_BIT, NULL);
+#if 0
 #if defined CONFIG_MPU_SPI
     spi_device_handle_t mpu_spi_handle;
     // Initialize SPI on HSPI host through SPIbus interface:
@@ -132,42 +205,6 @@ void app_main(void)
     }
     //WK_DEBUGI(TAG, "MPU connection successful!");
 
-    /* test for NRF24+ commnuitation */
-    rf24_init(&radio);
-    // Let these addresses be used for the pair
-    uint8_t address[][6] = {"1Node", "2Node"};
-    float payload = 0.0;
-    // to use different addresses on a pair of radios, we need a variable to
-    // uniquely identify which address this radio will use to transmit
-    bool radioNumber = 1; // 0 uses address[0] to transmit, 1 uses address[1] to transmit
-    // Used to control whether this node is sending or receiving
-    bool role = false;  // true = TX role, false = RX role
-
-    //radio.printDetails(&radio);
-
-    CHK_EXIT(radio.begin(&radio));
-    // Set the PA Level low to try preventing power supply related problems
-    // because these examples are likely run with nodes in close proximity to
-    // each other.
-    CHK_EXIT(radio.setPALevel(&radio, RF24_PA_LOW, true));  // RF24_PA_MAX is default.
-
-    // save on transmission time by setting the radio to only transmit the
-    // number of bytes we need to transmit a float
-    CHK_EXIT(radio.setPayloadSize(&radio, sizeof(payload))); // float datatype occupies 4 bytes
-
-    // set the TX address of the RX node into the TX pipe
-    CHK_EXIT(radio.openWritingPipeAddr(&radio, address[radioNumber]));     // always uses pipe 0
-
-    // set the RX address of the TX node into a RX pipe
-    CHK_EXIT(radio.openReadingPipeAddr(&radio, 1, address[!radioNumber])); // using pipe 1
-
-    // additional setup specific to the node's role
-    if (role) {
-        CHK_EXIT(radio.stopListening(&radio));  // put radio in TX mode
-    } else {
-        CHK_EXIT(radio.startListening(&radio)); // put radio in RX mode
-    }
-
     // Initialize
     CHK_EXIT(mpu.initialize(&mpu));  // initialize the chip and set initial configurations
     CHK_EXIT(mpu_rw_test(&mpu));
@@ -213,6 +250,7 @@ void app_main(void)
     xTaskCreate(mpu_get_sensor_data, "mpu_get_sensor_data", 2048, NULL, 2 | portPRIVILEGE_BIT, &mpu_isr_handle);
     xTaskCreate(uart_rx_task, "uart_rx_task", 1024*2, NULL, configMAX_PRIORITIES, NULL);
     //vTaskStartScheduler();
+#endif
 
     /*
     const fifo_config_t kFIFOConfig = FIFO_CFG_ACCEL | FIFO_CFG_GYRO;

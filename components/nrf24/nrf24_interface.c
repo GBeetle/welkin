@@ -17,6 +17,8 @@
 
 #include "nrf24_interface.h"
 
+//#define RECEIVE_DEBUG
+
 struct rf24 radio;
 
 static WK_RESULT begin(struct rf24 *nrf24);
@@ -315,8 +317,13 @@ static WK_RESULT _init_radio(struct rf24 *nrf24)
     nrf24->ack_payloads_enabled = false; // ack payloads disabled by default
     CHK_RES(nrf24->write_register(nrf24, DYNPD, 0x00, false));     // disable dynamic payloads by default (for all pipes)
     nrf24->dynamic_payloads_enabled = false;
+#ifdef RECEIVE_DEBUG
+    CHK_RES(nrf24->write_register(nrf24, EN_AA, 0x00, false));  // disable auto-ack on all pipes
+    CHK_RES(nrf24->write_register(nrf24, EN_RXADDR, 0x3f, false)); // only open RX pipe 0
+#else
     CHK_RES(nrf24->write_register(nrf24, EN_AA, 0x3f, false));  // enable auto-ack on all pipes
     CHK_RES(nrf24->write_register(nrf24, EN_RXADDR, 3, false)); // only open RX pipes 0 & 1
+#endif
     CHK_RES(nrf24->setPayloadSize(nrf24, 32));           // set static payload size to 32 (max) bytes by default
     CHK_RES(nrf24->setAddressWidth(nrf24, 5));           // set default address length to (max) 5 bytes
 
@@ -380,7 +387,7 @@ static WK_RESULT ce(struct rf24 *nrf24, bool level)
 
 static inline void beginTransaction(struct rf24 *nrf24)
 {
-    return nrf24->csn(nrf24, RF_LOW);
+    nrf24->csn(nrf24, RF_LOW);
 }
 
 /****************************************************************************/
@@ -432,10 +439,11 @@ static WK_RESULT write_register(struct rf24 *nrf24, uint8_t reg, uint8_t value, 
         nrf24->spi_txbuff[1] = value;
         CHK_RES(nrf24->bus->readWriteBytes(nrf24->bus, nrf24->addr, 0x00, 2, nrf24->spi_rxbuff, nrf24->spi_txbuff));
         nrf24->status = nrf24->spi_rxbuff[0];
+        WK_DEBUGI(RF24_TAG, "NRF24 status: %02x\n", nrf24->status);
     }
 error_exit:
     nrf24->endTransaction(nrf24);
-    
+
     return res;
 }
 
@@ -536,7 +544,7 @@ static WK_RESULT flush_tx(struct rf24 *nrf24)
 
 static uint8_t get_status(struct rf24 *nrf24)
 {
-    nrf24->write_register(nrf24, RF24_NOP, RF24_NOP, true);
+    nrf24->write_register(nrf24, RF24_NOP, RF24_NOP, false);
     return nrf24->status;
 }
 
@@ -1307,7 +1315,10 @@ static bool isAvailable(struct rf24 *nrf24)
 static bool available(struct rf24 *nrf24, uint8_t *pipe_num)
 {
     // get implied RX FIFO empty flag from status byte
-    uint8_t pipe = (nrf24->get_status(nrf24) >> RX_P_NO) & 0x07;
+    uint8_t status = nrf24->get_status(nrf24);
+
+    WK_DEBUGI(RF24_TAG, "available status: %02x, fifo status: %02x\r\n", status, nrf24->read_register(nrf24, FIFO_STATUS));
+    uint8_t pipe = (status >> RX_P_NO) & 0x07;
     if (pipe > 5)
         return 0;
 
