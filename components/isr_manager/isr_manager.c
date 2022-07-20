@@ -20,6 +20,7 @@
 uint32_t isr_counter = 0;
 uint8_t rx_command_id = 0x00;
 TaskHandle_t mpu_isr_handle;
+TaskHandle_t nrf24_isr_handle;
 
 isr_manager_t mpu_isr_manager = {
     .mpu_isr_status = DATA_NOT_READY,
@@ -43,6 +44,14 @@ void mpu_dmp_isr_handler(void* arg)
 }
 #endif
 
+void nrf24_interrupt_handler(void* arg)
+{
+    // notify task
+    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+    vTaskNotifyGiveFromISR(nrf24_isr_handle, &xHigherPriorityTaskWoken);
+    portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+}
+
 /*
  * Define UART interrupt subroutine to ackowledge interrupt
  */
@@ -55,7 +64,7 @@ static void uart_intr_handle(void *param)
     uart->int_clr.rxfifo_full = 1;
     uart->int_clr.frm_err = 1;
     uart->int_clr.rxfifo_tout = 1;
-    while (uart->status.rxfifo_cnt) {
+    while (uart->rf_status.rxfifo_cnt) {
         uint8_t c = uart->ahb_fifo.rw_byte;
         uart_write_bytes(UART_NUM_0, (char *)&c, 1);  //把接收的数据重新打印出来
     }

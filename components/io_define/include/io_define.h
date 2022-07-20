@@ -62,5 +62,7 @@ Pins in use. The SPI Master can use the GPIO mux, so feel free to change these i
 #define NRF24_SPI_CLOCK_SPEED SPI_MASTER_FREQ_10M
 
 #define NRF24_CE 5
+#define NRF24_INT 4
+#define NRF24_GPIO_INPUT_PIN_SEL  ((1ULL<<NRF24_INT))
 
 #endif /* end of include guard: _IO_DEFINE__ */

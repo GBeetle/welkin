@@ -55,7 +55,7 @@
 
 // Let these addresses be used for the pair
 uint8_t address[][6] = {"1Node", "2Node"};
-float payload = 0.0;
+static float payload = 0.0;
 // to use different addresses on a pair of radios, we need a variable to
 // uniquely identify which address this radio will use to transmit
 bool radioNumber = 0; // 0 uses address[0] to transmit, 1 uses address[1] to transmit
@@ -85,7 +85,7 @@ void loop(void* arg)
             if (radio.available(&radio, &pipe)) {              // is there a payload? get the pipe number that recieved it
                 uint8_t bytes = radio.getPayloadSize(&radio);  // get the size of the payload
                 radio.read(&radio, &payload, bytes);           // fetch payload from FIFO
-                ESP_LOGI(RF24_TAG, "Received data");
+                ESP_LOGI(RF24_TAG, "Received data: %f", payload);
             }
             else
                 ESP_LOGI(RF24_TAG, "Received nothing...");
@@ -125,6 +125,8 @@ void app_main(void)
     // number of bytes we need to transmit a float
     CHK_EXIT(radio.setPayloadSize(&radio, sizeof(payload))); // float datatype occupies 4 bytes
 
+    CHK_EXIT(radio.maskIRQ(&radio, false, false, true));
+
     // set the TX address of the RX node into the TX pipe
     CHK_EXIT(radio.openWritingPipeAddr(&radio, address[radioNumber]));     // always uses pipe 0
 
@@ -138,9 +140,28 @@ void app_main(void)
         CHK_EXIT(radio.startListening(&radio)); // put radio in RX mode
     }
 
-    ESP_LOGI(RF24_TAG, "NRF24 initialization DONE");
+    ESP_LOGI(RF24_TAG, "NRF24 initialization DONE, %p, %p", &radio, &(radio.get_status));
 
-    xTaskCreate(loop, "nrf24_loop", 2048, NULL, 2 | portPRIVILEGE_BIT, NULL);
+    gpio_config_t io_conf;
+
+    //interrupt of rising edge
+    io_conf.intr_type = GPIO_INTR_NEGEDGE;
+    //bit mask of the pins, use GPIO4/5 here
+    io_conf.pin_bit_mask = NRF24_GPIO_INPUT_PIN_SEL;
+    //set as input mode
+    io_conf.mode = GPIO_MODE_INPUT;
+    //enable pull-up mode
+    io_conf.pull_up_en = 1;
+    gpio_config(&io_conf);
+
+    //change gpio intrrupt type for one pin
+    gpio_set_intr_type(NRF24_INT, GPIO_INTR_ANYEDGE);
+    //install gpio isr service
+    gpio_install_isr_service(0);
+    //hook isr handler for specific gpio pin
+    gpio_isr_handler_add(NRF24_INT, nrf24_interrupt_handler, (void*) NRF24_INT);
+
+    //xTaskCreate(loop, "nrf24_loop", 2048, NULL, 2 | portPRIVILEGE_BIT, NULL);
 #if 0
 #if defined CONFIG_MPU_SPI
     spi_device_handle_t mpu_spi_handle;
@@ -251,6 +272,7 @@ void app_main(void)
     xTaskCreate(uart_rx_task, "uart_rx_task", 1024*2, NULL, configMAX_PRIORITIES, NULL);
     //vTaskStartScheduler();
 #endif
+    xTaskCreate(nrf24_interrupt_func, "nrf24 interrupt", 2048, NULL, 2 | portPRIVILEGE_BIT, &nrf24_isr_handle);
 
     /*
     const fifo_config_t kFIFOConfig = FIFO_CFG_ACCEL | FIFO_CFG_GYRO;

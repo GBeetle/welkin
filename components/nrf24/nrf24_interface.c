@@ -439,7 +439,7 @@ static WK_RESULT write_register(struct rf24 *nrf24, uint8_t reg, uint8_t value, 
         nrf24->spi_txbuff[1] = value;
         CHK_RES(nrf24->bus->readWriteBytes(nrf24->bus, nrf24->addr, 0x00, 2, nrf24->spi_rxbuff, nrf24->spi_txbuff));
         nrf24->status = nrf24->spi_rxbuff[0];
-        WK_DEBUGI(RF24_TAG, "NRF24 status: %02x\n", nrf24->status);
+        //WK_DEBUGI(RF24_TAG, "NRF24 status: %02x\n", nrf24->status);
     }
 error_exit:
     nrf24->endTransaction(nrf24);
@@ -1282,9 +1282,9 @@ static bool txStandByAfter(struct rf24 *nrf24, uint32_t timeout, bool startTx)
 static WK_RESULT maskIRQ(struct rf24 *nrf24, bool tx, bool fail, bool rx)
 {
     /* clear the interrupt flags */
-    nrf24->config_reg = (nrf24->config_reg & ~(1 << MASK_MAX_RT | 1 << MASK_TX_DS | 1 << MASK_RX_DR));
+    nrf24->config_reg = (nrf24->config_reg & (1 << MASK_MAX_RT | 1 << MASK_TX_DS | 1 << MASK_RX_DR));
     /* set the specified interrupt flags */
-    nrf24->config_reg = (nrf24->config_reg | fail << MASK_MAX_RT | tx << MASK_TX_DS | rx << MASK_RX_DR);
+    nrf24->config_reg = (nrf24->config_reg | ~(fail << MASK_MAX_RT | tx << MASK_TX_DS | rx << MASK_RX_DR));
     return nrf24->write_register(nrf24, NRF_CONFIG, nrf24->config_reg, false);
 }
 

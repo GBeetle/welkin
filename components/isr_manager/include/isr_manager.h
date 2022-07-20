@@ -34,10 +34,12 @@ typedef struct isr_manager {
 } isr_manager_t;
 
 void mpu_dmp_isr_handler(void* arg);
+void nrf24_interrupt_handler(void* arg);
 
 extern uint32_t isr_counter;
 extern uint8_t rx_command_id;
 extern TaskHandle_t mpu_isr_handle;
 extern isr_manager_t mpu_isr_manager;
+extern TaskHandle_t nrf24_isr_handle;
 
 #endif /* end of include guard: _TASK_MANAGER__ */

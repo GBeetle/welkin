@@ -124,3 +124,44 @@ void uart_rx_task(void *arg)
     }
     free(data);
 }
+
+void nrf24_interrupt_func(void *arg)
+{
+    float payload = 0.0;
+
+    while (1) {
+        uint8_t rf_status = radio.get_status(&radio);
+        if (rf_status & _BV(TX_DS)) {
+            WK_DEBUGI(RF24_TAG, "Transmission successful! ");
+        }
+        if (rf_status & _BV(RX_DR)) {
+            // This device is a RX node
+            uint8_t pipe;
+            if (radio.available(&radio, &pipe)) {              // is there a payload? get the pipe number that recieved it
+                uint8_t bytes = radio.getPayloadSize(&radio);  // get the size of the payload
+                radio.read(&radio, &payload, bytes);           // fetch payload from FIFO
+                WK_DEBUGI(RF24_TAG, "Received data: %f\n", payload);
+            }
+            else
+                WK_DEBUGI(RF24_TAG, "Received nothing...");
+        }
+        if (rf_status & _BV(MAX_RT)) {
+            WK_DEBUGI(RF24_TAG, "Transmission MAX_RT! ");
+        }
+        radio.write_register(&radio, NRF_STATUS, _BV(RX_DR) | _BV(TX_DS) | _BV(MAX_RT), false);
+        /* Wait to be notified that the transmission is complete.  Note
+        the first parameter is pdTRUE, which has the effect of clearing
+        the task's notification value back to 0, making the notification
+        value act like a binary (rather than a counting) semaphore.  */
+        uint32_t ul_notification_value;
+        const TickType_t max_block_time = pdMS_TO_TICKS( 200 );
+        ul_notification_value = ulTaskNotifyTake(pdTRUE, max_block_time );
+
+        if( ul_notification_value == 1 ) {
+            /* The transmission ended as expected. */
+        }
+        else {
+            /* The call to ulTaskNotifyTake() timed out. */
+        }
+    }
+}
