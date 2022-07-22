@@ -17,8 +17,6 @@
 
 #include "nrf24_interface.h"
 
-//#define RECEIVE_DEBUG
-
 struct rf24 radio;
 
 static WK_RESULT begin(struct rf24 *nrf24);
@@ -317,13 +315,8 @@ static WK_RESULT _init_radio(struct rf24 *nrf24)
     nrf24->ack_payloads_enabled = false; // ack payloads disabled by default
     CHK_RES(nrf24->write_register(nrf24, DYNPD, 0x00, false));     // disable dynamic payloads by default (for all pipes)
     nrf24->dynamic_payloads_enabled = false;
-#ifdef RECEIVE_DEBUG
-    CHK_RES(nrf24->write_register(nrf24, EN_AA, 0x00, false));  // disable auto-ack on all pipes
-    CHK_RES(nrf24->write_register(nrf24, EN_RXADDR, 0x3f, false)); // only open RX pipe 0
-#else
     CHK_RES(nrf24->write_register(nrf24, EN_AA, 0x3f, false));  // enable auto-ack on all pipes
     CHK_RES(nrf24->write_register(nrf24, EN_RXADDR, 3, false)); // only open RX pipes 0 & 1
-#endif
     CHK_RES(nrf24->setPayloadSize(nrf24, 32));           // set static payload size to 32 (max) bytes by default
     CHK_RES(nrf24->setAddressWidth(nrf24, 5));           // set default address length to (max) 5 bytes
 

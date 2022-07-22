@@ -55,49 +55,13 @@
 
 // Let these addresses be used for the pair
 uint8_t address[][6] = {"1Node", "2Node"};
-static float payload = 0.0;
 // to use different addresses on a pair of radios, we need a variable to
 // uniquely identify which address this radio will use to transmit
 bool radioNumber = 0; // 0 uses address[0] to transmit, 1 uses address[1] to transmit
-// Used to control whether this node is sending or receiving
-bool role = false;  // true = TX role, false = RX role
-
-void loop(void* arg)
-{
-    while (true) {
-        if (role) {
-            ESP_LOGI(RF24_TAG, "Transmission begin! ");  // payload was delivered
-            // This device is a TX node
-            WK_RESULT report = radio.write(&radio, &payload, sizeof(float));  // transmit & save the report
-
-            if (report >= 0) {
-                ESP_LOGI(RF24_TAG, "Transmission successful! ");  // payload was delivered
-                payload += 0.01;          // increment float payload
-            } else {
-                ESP_LOGI(RF24_TAG, "Transmission failed or timed out");  // payload was not delivered
-            }
-            // to make this example readable in the serial monitor
-            // slow transmissions down by 1 second
-            // vTaskDelay(1000 / portTICK_PERIOD_MS);
-        } else {
-            // This device is a RX node
-            uint8_t pipe;
-            if (radio.available(&radio, &pipe)) {              // is there a payload? get the pipe number that recieved it
-                uint8_t bytes = radio.getPayloadSize(&radio);  // get the size of the payload
-                radio.read(&radio, &payload, bytes);           // fetch payload from FIFO
-                ESP_LOGI(RF24_TAG, "Received data: %f", payload);
-            }
-            else
-                ESP_LOGI(RF24_TAG, "Received nothing...");
-        }
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
-    }
-}
 
 //Main application
 void app_main(void)
 {
-    //fflush(stdout);
     welkin_log_system_init();
     uart_config_t uart_config = {
         .baud_rate  = 115200,
@@ -110,96 +74,7 @@ void app_main(void)
     ESP_ERROR_CHECK(uart_driver_install(UART_NUM_0, 2*1024, 0, 0, NULL, 0));
     ESP_ERROR_CHECK(uart_param_config(UART_NUM_0, &uart_config));
 
-    /* test for NRF24+ commnuitation */
-    rf24_init(&radio);
-
-    //radio.printDetails(&radio);
-
-    CHK_EXIT(radio.begin(&radio));
-    // Set the PA Level low to try preventing power supply related problems
-    // because these examples are likely run with nodes in close proximity to
-    // each other.
-    CHK_EXIT(radio.setPALevel(&radio, RF24_PA_LOW, true));  // RF24_PA_MAX is default.
-
-    // save on transmission time by setting the radio to only transmit the
-    // number of bytes we need to transmit a float
-    CHK_EXIT(radio.setPayloadSize(&radio, sizeof(payload))); // float datatype occupies 4 bytes
-
-    CHK_EXIT(radio.maskIRQ(&radio, false, false, true));
-
-    // set the TX address of the RX node into the TX pipe
-    CHK_EXIT(radio.openWritingPipeAddr(&radio, address[radioNumber]));     // always uses pipe 0
-
-    // set the RX address of the TX node into a RX pipe
-    CHK_EXIT(radio.openReadingPipeAddr(&radio, 1, address[!radioNumber])); // using pipe 1
-
-    // additional setup specific to the node's role
-    if (role) {
-        CHK_EXIT(radio.stopListening(&radio));  // put radio in TX mode
-    } else {
-        CHK_EXIT(radio.startListening(&radio)); // put radio in RX mode
-    }
-
-    ESP_LOGI(RF24_TAG, "NRF24 initialization DONE, %p, %p", &radio, &(radio.get_status));
-
-    gpio_config_t io_conf;
-
-    //interrupt of rising edge
-    io_conf.intr_type = GPIO_INTR_NEGEDGE;
-    //bit mask of the pins, use GPIO4/5 here
-    io_conf.pin_bit_mask = NRF24_GPIO_INPUT_PIN_SEL;
-    //set as input mode
-    io_conf.mode = GPIO_MODE_INPUT;
-    //enable pull-up mode
-    io_conf.pull_up_en = 1;
-    gpio_config(&io_conf);
-
-    //change gpio intrrupt type for one pin
-    gpio_set_intr_type(NRF24_INT, GPIO_INTR_ANYEDGE);
-    //install gpio isr service
-    gpio_install_isr_service(0);
-    //hook isr handler for specific gpio pin
-    gpio_isr_handler_add(NRF24_INT, nrf24_interrupt_handler, (void*) NRF24_INT);
-
-    //xTaskCreate(loop, "nrf24_loop", 2048, NULL, 2 | portPRIVILEGE_BIT, NULL);
-#if 0
-#if defined CONFIG_MPU_SPI
-    spi_device_handle_t mpu_spi_handle;
-    // Initialize SPI on HSPI host through SPIbus interface:
-    init_spi(&fspi, SPI2_HOST);
-    // disable SPI DMA in begin
-    CHK_EXIT(fspi.begin(&fspi, MPU_FSPI_MOSI, MPU_FSPI_MISO, MPU_FSPI_SCLK, SPI_MAX_DMA_LEN));
-    CHK_EXIT(fspi.addDevice(&fspi, 8, 0, MPU_SPI_CLOCK_SPEED, MPU_FSPI_CS, &mpu_spi_handle));
-
-    init_mpu(&mpu, &fspi, mpu_spi_handle);
-#endif
-
-#if defined CONFIG_MPU_I2C
-    init_i2c(&i2c0, I2C_NUM_0);
-    CHK_EXIT(i2c0.begin(&i2c0, MPU_SDA, MPU_SCL, MPU_I2C_CLOCK_SPEED));
-    mpu_addr_handle_t  MPU_DEFAULT_I2CADDRESS = MPU_I2CADDRESS_AD0_LOW;
-
-    init_mpu(&mpu, &i2c0, MPU_DEFAULT_I2CADDRESS);
-#endif
-
-#if defined CONFIG_BMP_SPI
-    spi_device_handle_t bmp_spi_handle;
-    // Initialize SPI on HSPI host through SPIbus interface:
-    init_spi(&hspi, SPI3_HOST);
-    // disable SPI DMA in begin
-    CHK_EXIT(hspi.begin(&hspi, BMP_HSPI_MOSI, BMP_HSPI_MISO, BMP_HSPI_SCLK, SPI_MAX_DMA_LEN));
-    CHK_EXIT(hspi.addDevice(&hspi, 8, 0, BMP_SPI_CLOCK_SPEED, BMP_HSPI_CS, &bmp_spi_handle));
-
-    CHK_EXIT(bmp280_init_desc(&bmp280_device, &hspi, bmp_spi_handle));
-#endif
-
-#if defined CONFIG_BMP_I2C
-    init_i2c(&i2c1, I2C_NUM_1);
-    CHK_EXIT(i2c1.begin(&i2c1, BMP_SDA, BMP_SCL, BMP_I2C_CLOCK_SPEED));
-    bmp_i2caddr_t  BMP_DEFAULT_I2CADDRESS = BMP280_I2C_ADDRESS_0;
-
-    CHK_EXIT(bmp280_init_desc(&bmp280_device, &i2c1, BMP_DEFAULT_I2CADDRESS));
-#endif
+    init_mpu(&mpu);
 
     bmp280_params_t bmp280_params;
 
@@ -224,7 +99,6 @@ void app_main(void)
         WK_DEBUGE(ERROR_TAG, "Failed to connect to the MPU\n");
         vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
-    //WK_DEBUGI(TAG, "MPU connection successful!");
 
     // Initialize
     CHK_EXIT(mpu.initialize(&mpu));  // initialize the chip and set initial configurations
@@ -247,31 +121,58 @@ void app_main(void)
 
     //CHK_EXIT(dmp_initialize(&mpu));
 
-#ifdef MPU_INT_ENABLE
+    /***********************************/
+    /*********** NRF24 INIT ************/
+    /***********************************/
+    rf24_init(&radio);
+    //radio.printDetails(&radio);
+    CHK_EXIT(radio.begin(&radio));
+    // Set the PA Level low to try preventing power supply related problems
+    // because these examples are likely run with nodes in close proximity to
+    // each other.
+    CHK_EXIT(radio.setPALevel(&radio, RF24_PA_LOW, true));  // RF24_PA_MAX is default.
+    // save on transmission time by setting the radio to only transmit the
+    // number of bytes we need to transmit a float
+    CHK_EXIT(radio.setPayloadSize(&radio, sizeof(float))); // float datatype occupies 4 bytes
+    CHK_EXIT(radio.maskIRQ(&radio, false, false, true));
+    // set the TX address of the RX node into the TX pipe
+    CHK_EXIT(radio.openWritingPipeAddr(&radio, address[radioNumber]));     // always uses pipe 0
+    // set the RX address of the TX node into a RX pipe
+    CHK_EXIT(radio.openReadingPipeAddr(&radio, 1, address[!radioNumber])); // using pipe 1
+    // additional setup specific to the node's role
+    CHK_EXIT(radio.startListening(&radio)); // put radio in RX mode
+    ESP_LOGI(RF24_TAG, "NRF24 initialization DONE, %p, %p", &radio, &(radio.get_status));
+
+    /***********************************/
+    /*********** NRF24 INT *************/
+    /***********************************/
     gpio_config_t io_conf;
 
-    //interrupt of rising edge
-    io_conf.intr_type = GPIO_INTR_POSEDGE;
-    //bit mask of the pins, use GPIO4/5 here
-    io_conf.pin_bit_mask = MPU_GPIO_INPUT_PIN_SEL;
-    //set as input mode
-    io_conf.mode = GPIO_MODE_INPUT;
-    //enable pull-up mode
-    io_conf.pull_up_en = 1;
+    io_conf.intr_type    = GPIO_INTR_NEGEDGE;
+    io_conf.pin_bit_mask = NRF24_GPIO_INPUT_PIN_SEL;
+    io_conf.mode         = GPIO_MODE_INPUT;
+    io_conf.pull_up_en   = 1;
     gpio_config(&io_conf);
 
-    //change gpio intrrupt type for one pin
-    gpio_set_intr_type(MPU_DMP_INT, GPIO_INTR_ANYEDGE);
-    //install gpio isr service
+    gpio_set_intr_type(NRF24_INT, GPIO_INTR_ANYEDGE);
     gpio_install_isr_service(0);
-    //hook isr handler for specific gpio pin
+    gpio_isr_handler_add(NRF24_INT, nrf24_interrupt_handler, (void*) NRF24_INT);
+
+#ifdef MPU_INT_ENABLE
+    gpio_config_t mpu_io_conf;
+
+    mpu_io_conf.intr_type    = GPIO_INTR_POSEDGE;
+    mpu_io_conf.pin_bit_mask = MPU_GPIO_INPUT_PIN_SEL;
+    mpu_io_conf.mode         = GPIO_MODE_INPUT;
+    mpu_io_conf.pull_up_en   = 1;
+
+    gpio_config(&mpu_io_conf);
+    gpio_set_intr_type(MPU_DMP_INT, GPIO_INTR_ANYEDGE);
     gpio_isr_handler_add(MPU_DMP_INT, mpu_dmp_isr_handler, (void*) MPU_DMP_INT);
 #endif
 
     xTaskCreate(mpu_get_sensor_data, "mpu_get_sensor_data", 2048, NULL, 2 | portPRIVILEGE_BIT, &mpu_isr_handle);
     xTaskCreate(uart_rx_task, "uart_rx_task", 1024*2, NULL, configMAX_PRIORITIES, NULL);
-    //vTaskStartScheduler();
-#endif
     xTaskCreate(nrf24_interrupt_func, "nrf24 interrupt", 2048, NULL, 2 | portPRIVILEGE_BIT, &nrf24_isr_handle);
 
     /*

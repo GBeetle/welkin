@@ -144,6 +144,26 @@ error_exit:
 WK_RESULT bmp280_init(bmp280_t *dev, bmp280_params_t *params)
 {
     WK_RESULT res = WK_OK;
+
+#if defined CONFIG_BMP_SPI
+    spi_device_handle_t bmp_spi_handle;
+    // Initialize SPI on HSPI host through SPIbus interface:
+    init_spi(&hspi, SPI3_HOST);
+    // disable SPI DMA in begin
+    CHK_LOGE(hspi.begin(&hspi, BMP_HSPI_MOSI, BMP_HSPI_MISO, BMP_HSPI_SCLK, SPI_MAX_DMA_LEN), "hspi begin fail");
+    CHK_LOGE(hspi.addDevice(&hspi, 8, 0, BMP_SPI_CLOCK_SPEED, BMP_HSPI_CS, &bmp_spi_handle), "hspi addDevice fail");
+
+    CHK_LOGE(bmp280_init_desc(&bmp280_device, &hspi, bmp_spi_handle), "bmp280_init_desc fail");
+#endif
+
+#if defined CONFIG_BMP_I2C
+    init_i2c(&i2c1, I2C_NUM_1);
+    CHK_LOGE(i2c1.begin(&i2c1, BMP_SDA, BMP_SCL, BMP_I2C_CLOCK_SPEED), "i2c1 begin fail");
+    bmp_i2caddr_t  BMP_DEFAULT_I2CADDRESS = BMP280_I2C_ADDRESS_0;
+
+    CHK_LOGE(bmp280_init_desc(&bmp280_device, &i2c1, BMP_DEFAULT_I2CADDRESS), "bmp280_init_desc fail");
+#endif
+
     CHK_NULL(dev && params, WK_BMP_DEVICE_NULL);
     CHK_NULL(dev->bus, WK_BMP_DEVICE_BUS_NULL);
 

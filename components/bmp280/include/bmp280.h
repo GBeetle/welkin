@@ -26,6 +26,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <esp_timer.h>
+#include "io_define.h"
 
 typedef enum {  //
     BMP280_I2C_ADDRESS_0  = 0x76, //!< I2C address when SDO pin is low,

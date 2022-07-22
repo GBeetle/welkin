@@ -53,6 +53,7 @@
 #include "AHRS.h"
 #include "log_sys.h"
 #include "error_handle.h"
+#include "io_define.h"
 
 #define MPU_ERR_CHECK(x) (x)
 
@@ -261,7 +262,7 @@ struct mpu
     WK_RESULT err;          /*!< Holds last error code */
 };
 
-void init_mpu(struct mpu *mpu, mpu_bus_t *bus, mpu_addr_handle_t addr);
+void init_mpu(struct mpu *mpu);
 
 extern const accel_fs_t accel_fs;
 extern const gyro_fs_t gyro_fs;

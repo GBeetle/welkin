@@ -186,9 +186,28 @@ static WK_RESULT writeBytes(struct mpu *mpu, uint8_t regAddr, size_t length, con
  * @param bus Bus protocol object of type `I2Cbus` or `SPIbus`.
  * @param addr I2C address (`mpu_i2caddr_t`) or SPI device handle (`spi_device_handle_t`).
  */
-void init_mpu(struct mpu *mpu, mpu_bus_t* bus, mpu_addr_handle_t addr) {
-    mpu->bus  = bus;
-    mpu->addr = addr;
+void init_mpu(struct mpu *mpu) {
+
+#if defined CONFIG_MPU_SPI
+    spi_device_handle_t mpu_spi_handle;
+    // Initialize SPI on HSPI host through SPIbus interface:
+    init_spi(&fspi, SPI2_HOST);
+    // disable SPI DMA in begin
+    CHK_EXIT(fspi.begin(&fspi, MPU_FSPI_MOSI, MPU_FSPI_MISO, MPU_FSPI_SCLK, SPI_MAX_DMA_LEN));
+    CHK_EXIT(fspi.addDevice(&fspi, 8, 0, MPU_SPI_CLOCK_SPEED, MPU_FSPI_CS, &mpu_spi_handle));
+
+    mpu->bus  = &fspi;
+    mpu->addr = mpu_spi_handle;
+#endif
+
+#if defined CONFIG_MPU_I2C
+    init_i2c(&i2c0, I2C_NUM_0);
+    CHK_EXIT(i2c0.begin(&i2c0, MPU_SDA, MPU_SCL, MPU_I2C_CLOCK_SPEED));
+    mpu_addr_handle_t  MPU_DEFAULT_I2CADDRESS = MPU_I2CADDRESS_AD0_LOW;
+
+    mpu->bus  = &i2c0;
+    mpu->addr = MPU_DEFAULT_I2CADDRESS;
+#endif
     memset(mpu->buffer, 0xff, 16);
     mpu->err = WK_OK;
 
