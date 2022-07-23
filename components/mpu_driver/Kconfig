@@ -2,6 +2,10 @@ menu "mpu_driver"
 
     config MPU6500
         bool "enable mpu6500"
+        default "n"
+
+    config MPU6050
+        bool "enable mpu6050"
         default "y"
-    
+
 endmenu

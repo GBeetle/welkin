@@ -25,9 +25,15 @@
         "stdarg.h": "c",
         "io_define.h": "c",
         "task_manager.h": "c",
-        "isr_manager.h": "c"
+        "isr_manager.h": "c",
+        "nrf24_interface.h": "c",
+        "bmp280.h": "c"
     },
     "C_Cpp.errorSquiggles": "Disabled",
     "idf.adapterTargetName": "esp32s2",
-    "idf.portWin": "COM3"
+    "idf.portWin": "COM3",
+    "idf.openOcdConfigs": [
+        "interface/ftdi/esp32_devkitj_v1.cfg",
+        "target/esp32s2.cfg"
+    ]
 }

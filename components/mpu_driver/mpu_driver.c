@@ -951,11 +951,11 @@ static WK_RESULT setMotionDetectConfig(struct mpu *mpu, mot_config_t* config)
 {
     WK_RESULT res = WK_OK;
 #if defined CONFIG_MPU6050
-    CHK_RES(mpu->writeByte(mpu, MOTION_DUR, config.time));
+    CHK_RES(mpu->writeByte(mpu, MOTION_DUR, config->time));
     CHK_RES(mpu->writeBits(mpu, MOTION_DETECT_CTRL, MOTCTRL_ACCEL_ON_DELAY_BIT,
-                                MOTCTRL_ACCEL_ON_DELAY_LENGTH, config.accel_on_delay));
+                                MOTCTRL_ACCEL_ON_DELAY_LENGTH, config->accel_on_delay));
     CHK_RES(mpu->writeBits(mpu, MOTION_DETECT_CTRL, MOTCTRL_MOT_COUNT_BIT, MOTCTRL_MOT_COUNT_LENGTH,
-                                config.counter));
+                                config->counter));
 #endif
     CHK_RES(mpu->writeByte(mpu, MOTION_THR, config->threshold));
 error_exit:
@@ -998,11 +998,11 @@ mot_config_t getMotionDetectConfig(struct mpu *mpu)
  *
  * @note Enable by calling setMotionFeatureEnabled();
  * */
-static WK_RESULT setZeroMotionConfig(struct mpu *mpu, zrmot_config_t* config)
+WK_RESULT setZeroMotionConfig(struct mpu *mpu, zrmot_config_t* config)
 {
     WK_RESULT res = WK_OK;
-    mpu->buffer[0] = config.threshold;
-    mpu->buffer[1] = config.time;
+    mpu->buffer[0] = config->threshold;
+    mpu->buffer[1] = config->time;
     CHK_RES(mpu->writeBytes(mpu, ZRMOTION_THR, 2, mpu->buffer));
 error_exit:
     return res;
@@ -1014,7 +1014,7 @@ error_exit:
 zrmot_config_t getZeroMotionConfig(struct mpu *mpu)
 {
     CHK_VAL(mpu->readBytes(mpu, ZRMOTION_THR, 2, mpu->buffer));
-    zrmot_config_t config{};
+    zrmot_config_t config;
     config.threshold = mpu->buffer[0];
     config.time      = mpu->buffer[1];
     return config;
@@ -1036,13 +1036,13 @@ zrmot_config_t getZeroMotionConfig(struct mpu *mpu)
 static WK_RESULT setFreeFallConfig(struct mpu *mpu, ff_config_t* config)
 {
     WK_RESULT res = WK_OK;
-    mpu->buffer[0] = config.threshold;
-    mpu->buffer[1] = config.time;
+    mpu->buffer[0] = config->threshold;
+    mpu->buffer[1] = config->time;
     CHK_RES(mpu->writeBytes(mpu, FF_THR, 2, mpu->buffer));
     CHK_RES(mpu->writeBits(mpu, MOTION_DETECT_CTRL, MOTCTRL_ACCEL_ON_DELAY_BIT,
-                                MOTCTRL_ACCEL_ON_DELAY_LENGTH, config.accel_on_delay));
+                                MOTCTRL_ACCEL_ON_DELAY_LENGTH, config->accel_on_delay));
     CHK_RES(mpu->writeBits(mpu, MOTION_DETECT_CTRL, MOTCTRL_MOT_COUNT_BIT, MOTCTRL_MOT_COUNT_LENGTH,
-                                config.counter));
+                                config->counter));
 error_exit:
     return res;
 }
@@ -1052,7 +1052,7 @@ error_exit:
  */
 ff_config_t getFreeFallConfig(struct mpu *mpu)
 {
-    ff_config_t config{};
+    ff_config_t config;
     CHK_VAL(mpu->readBytes(mpu, FF_THR, 2, mpu->buffer));
     config.threshold = mpu->buffer[0];
     config.time      = mpu->buffer[1];
@@ -2551,7 +2551,7 @@ static WK_RESULT accelSelfTest(struct mpu *mpu, raw_axes_t* regularBias, raw_axe
     /* Get OTP production shift code */
     uint8_t shiftCode[3];
 #if defined CONFIG_MPU6050
-    if (MPU_ERR_CHECK(mpu->readBytes(mpu, SELF_TEST_X, 4, mpu->buffer))) return mpu->err;
+    CHK_RES(mpu->readBytes(mpu, SELF_TEST_X, 4, mpu->buffer));
     shiftCode[0] = ((mpu->buffer[0] & 0xE0) >> 3) | ((mpu->buffer[3] & 0x30) >> 4);
     shiftCode[1] = ((mpu->buffer[1] & 0xE0) >> 3) | ((mpu->buffer[3] & 0x0C) >> 2);
     shiftCode[2] = ((mpu->buffer[2] & 0xE0) >> 3) | (mpu->buffer[3] & 0x03);
@@ -2646,7 +2646,7 @@ static WK_RESULT gyroSelfTest(struct mpu *mpu, raw_axes_t* regularBias, raw_axes
     /* Get OTP production shift code */
     uint8_t shiftCode[3];
 #if defined CONFIG_MPU6050
-    if (MPU_ERR_CHECK(readBytes(SELF_TEST_X, 3, mpu->buffer))) return mpu->err;
+    CHK_RES(mpu->readBytes(mpu, SELF_TEST_X, 3, mpu->buffer));
     shiftCode[0] = mpu->buffer[0] & 0x1F;
     shiftCode[1] = mpu->buffer[1] & 0x1F;
     shiftCode[2] = mpu->buffer[2] & 0x1F;

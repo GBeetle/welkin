@@ -1226,8 +1226,8 @@ CONFIG_ERROR_HANDLE=y
 #
 # i2c_bus
 #
-# CONFIG_MPU_I2C is not set
-# CONFIG_BMP_I2C is not set
+CONFIG_MPU_I2C=y
+CONFIG_BMP_I2C=y
 # end of i2c_bus
 
 #
@@ -1257,7 +1257,8 @@ CONFIG_LOG_SYSTEM=y
 #
 # mpu_driver
 #
-CONFIG_MPU6500=y
+# CONFIG_MPU6500 is not set
+CONFIG_MPU6050=y
 # end of mpu_driver
 
 #
@@ -1269,8 +1270,8 @@ CONFIG_NFR24=y
 #
 # spi_bus
 #
-CONFIG_MPU_SPI=y
-CONFIG_BMP_SPI=y
+# CONFIG_MPU_SPI is not set
+# CONFIG_BMP_SPI is not set
 CONFIG_NRF24_SPI=y
 # end of spi_bus
 
